@@ -17,27 +17,48 @@ export function AmbientColor({ color }: { color: string | null }) {
   return null;
 }
 
-function Confetti() {
-  const [bits] = useState(() => Array.from({ length: 26 }, (_, i) => {
-    const a = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.3;
-    const d = 90 + Math.random() * 110;
-    return { x: Math.cos(a) * d, y: Math.sin(a) * d, r: Math.random() * 540, c: ["#fff", "#67d87a", "#5b9bff", "#ffd166", "#ff8fab"][i % 5] };
-  }));
+const EMOJI: Record<Kind, string[]> = { movie: ["🍿", "🎬", "⭐"], series: ["📺", "🍿", "⭐"], game: ["🎮", "🏆", "⭐"], book: ["📚", "✨", "⭐"] };
+
+// Explosão: papeizinhos + emojis do tipo, com gravidade
+function Confetti({ kind }: { kind: Kind }) {
+  const [bits] = useState(() =>
+    Array.from({ length: 44 }, (_, i) => {
+      const a = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.5;
+      const d = 110 + Math.random() * 170;
+      const emoji = i % 6 === 0 ? EMOJI[kind][(i / 6) % 3] : null;
+      return { x: Math.cos(a) * d, y: Math.sin(a) * d, r: (Math.random() - 0.5) * 900, c: ["#fff", "#67d87a", "#5b9bff", "#ffd166", "#ff8fab"][i % 5], round: i % 3 === 0, emoji, delay: Math.random() * 0.08 };
+    }),
+  );
   return (
-    <span className="pointer-events-none absolute left-1/2 top-1/2">
+    <span className="pointer-events-none absolute left-1/2 top-1/2 z-10">
       {bits.map((b, i) => (
         <motion.span
           key={i}
-          className="absolute h-2.5 w-1.5 rounded-[2px]"
-          style={{ background: b.c }}
-          initial={{ x: 0, y: 0, opacity: 1, rotate: 0 }}
-          animate={{ x: b.x, y: [0, b.y, b.y + 60], opacity: [1, 1, 0], rotate: b.r }}
-          transition={{ duration: 1.2, ease: "easeOut" }}
-        />
+          className={`absolute ${b.emoji ? "text-[22px] leading-none" : b.round ? "h-2 w-2 rounded-full" : "h-3 w-1.5 rounded-[2px]"}`}
+          style={b.emoji ? undefined : { background: b.c }}
+          initial={{ x: 0, y: 0, opacity: 1, rotate: 0, scale: 0.4 }}
+          animate={{ x: [0, b.x * 0.85, b.x], y: [0, b.y, b.y + 140], opacity: [1, 1, 0], rotate: b.r, scale: b.emoji ? [0.4, 1.3, 1] : 1 }}
+          transition={{ duration: 1.5, ease: [0.2, 0.8, 0.4, 1], delay: b.delay, times: [0, 0.45, 1] }}
+        >
+          {b.emoji}
+        </motion.span>
       ))}
     </span>
   );
 }
+
+const SPARKS = [
+  { l: "8%", t: "10%", dx: "-14px", dy: "-16px", d: "0ms" },
+  { l: "30%", t: "-6%", dx: "-4px", dy: "-20px", d: "220ms" },
+  { l: "58%", t: "-8%", dx: "6px", dy: "-22px", d: "90ms" },
+  { l: "86%", t: "6%", dx: "16px", dy: "-16px", d: "330ms" },
+  { l: "94%", t: "62%", dx: "20px", dy: "6px", d: "160ms" },
+  { l: "70%", t: "92%", dx: "8px", dy: "18px", d: "420ms" },
+  { l: "22%", t: "90%", dx: "-10px", dy: "18px", d: "280ms" },
+  { l: "-2%", t: "52%", dx: "-20px", dy: "2px", d: "380ms" },
+];
+
+const DONE_TEXT: Record<Kind, string> = { movie: "Visto!", series: "Maratonada!", game: "Zerado!", book: "Lido!" };
 
 // Botão azul principal ("Watched ✓"). Depois de marcar, confete e 5s para desfazer.
 export function DoneButton({ itemId, kind }: { itemId: string; kind: Kind }) {
@@ -54,7 +75,11 @@ export function DoneButton({ itemId, kind }: { itemId: string; kind: Kind }) {
     [],
   );
 
-  function mark() {
+  const [origin, setOrigin] = useState({ x: 50, y: 50 });
+  function mark(e: React.MouseEvent<HTMLButtonElement>) {
+    // A onda verde nasce de onde o dedo/mouse tocou
+    const r = e.currentTarget.getBoundingClientRect();
+    setOrigin({ x: ((e.clientX - r.left) / r.width) * 100 || 50, y: ((e.clientY - r.top) / r.height) * 100 || 50 });
     setDone(true);
     navigator.vibrate?.([12, 30, 12]);
     start(async () => {
@@ -86,18 +111,67 @@ export function DoneButton({ itemId, kind }: { itemId: string; kind: Kind }) {
       <motion.button
         onClick={mark}
         disabled={pending || done}
-        whileTap={{ scale: 0.96 }}
-        className={`relative flex h-12 flex-1 items-center justify-center gap-2 rounded-full text-[16px] font-semibold transition-colors sm:flex-none sm:px-9 ${done ? "bg-success text-black" : "btn-accent"}`}
+        whileTap={{ scale: 0.92 }}
+        animate={done ? { scale: [1, 0.86, 1.12, 0.97, 1] } : { scale: 1 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className={`lift group btn-accent relative flex h-12 flex-1 items-center justify-center gap-2 rounded-full text-[16px] font-semibold sm:flex-none sm:px-9 ${done ? "" : "done-btn"}`}
       >
+        {!done && <span className="shine" />}
+        {/* Faíscas do hover (CSS), saindo das bordas */}
+        {!done &&
+          SPARKS.map((k, i) => (
+            <span key={i} aria-hidden className="spark" style={{ left: k.l, top: k.t, "--dx": k.dx, "--dy": k.dy, "--d": k.d } as React.CSSProperties}>
+              ✦
+            </span>
+          ))}
+        {/* Onda verde a partir do toque */}
+        <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-full">
+          <AnimatePresence>
+            {done && (
+              <motion.span
+                className="absolute aspect-square w-[260%] rounded-full bg-success"
+                style={{ left: `${origin.x}%`, top: `${origin.y}%`, x: "-50%", y: "-50%" }}
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+              />
+            )}
+          </AnimatePresence>
+        </span>
+        {/* Onda de choque em volta */}
+        {done && (
+          <motion.span
+            className="pointer-events-none absolute inset-0 rounded-full border-2 border-success"
+            initial={{ scale: 1, opacity: 0.9 }}
+            animate={{ scale: 1.7, opacity: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut", delay: 0.15 }}
+          />
+        )}
         <AnimatePresence mode="wait" initial={false}>
-          <motion.span key={String(done)} initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -10, opacity: 0 }} className="flex items-center gap-2">
-            {done ? "Saiu da lista!" : DONE_LABEL[kind]}
-            <span className={`flex h-5 w-5 items-center justify-center rounded-full ${done ? "bg-black/15" : "bg-white/25"}`}>
-              <Check size={13} strokeWidth={3.5} />
+          <motion.span
+            key={String(done)}
+            initial={{ y: 14, opacity: 0, scale: 0.8 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: -14, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 500, damping: 26, delay: done ? 0.12 : 0 }}
+            className={`relative flex items-center gap-2 ${done ? "text-black" : ""}`}
+          >
+            {done ? DONE_TEXT[kind] : DONE_LABEL[kind]}
+            <span className={`done-badge flex h-6 w-6 items-center justify-center rounded-full transition-colors duration-200 ${done ? "bg-black/15" : "bg-white/25"}`}>
+              {done ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                  <motion.path d="M4 12.5l5 5L20 6.5" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.4, delay: 0.3, ease: "easeOut" }} />
+                </svg>
+              ) : (
+                <svg className="done-check" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 12.5l5 5L20 6.5" />
+                </svg>
+              )}
             </span>
           </motion.span>
         </AnimatePresence>
-        {done && <Confetti />}
+        {done && <Confetti kind={kind} />}
       </motion.button>
 
       <AnimatePresence>
@@ -134,10 +208,12 @@ export function PinButton({ itemId, initial }: { itemId: string; initial: boolea
       }}
       aria-pressed={on}
       aria-label={on ? "Tirar de quero muito" : "Quero muito"}
-      className="glass relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
+      className="glass lift heart-hover group relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
     >
       <motion.span key={String(on)} initial={{ scale: 0.3 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 520, damping: 13 }}>
-        <Heart size={21} className={on ? "fill-danger text-danger" : ""} />
+        <span className="heartbeat block">
+          <Heart size={21} className={`transition-colors duration-200 ${on ? "fill-danger text-danger" : "group-hover:text-danger"}`} />
+        </span>
       </motion.span>
       <AnimatePresence>
         {burst > 0 && on && (
@@ -182,9 +258,10 @@ export function CopyButton({ itemId, kind, title, cover }: { itemId: string; kin
         })
       }
       disabled={pending}
-      className="btn-accent flex h-12 flex-1 items-center justify-center gap-2 rounded-full px-7 text-[16px] font-semibold sm:flex-none"
+      className="btn-accent lift group relative flex h-12 flex-1 items-center justify-center gap-2 rounded-full px-7 text-[16px] font-semibold sm:flex-none"
     >
-      {pending ? <Loader2 size={18} className="animate-spin" /> : <Plus size={19} />} Quero ver também
+      <span className="shine" />
+      {pending ? <Loader2 size={18} className="animate-spin" /> : <Plus size={19} className="transition-transform duration-300 group-hover:rotate-90" />} Quero ver também
     </button>
     </>
   );
@@ -222,8 +299,8 @@ export function ItemMenu({ itemId }: { itemId: string }) {
   const row = "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[14px] hover:bg-white/10";
   return (
     <div className="relative">
-      <button onClick={() => setOpen((v) => !v)} className="glass flex h-12 w-12 items-center justify-center rounded-full" aria-label="Mais opções" aria-expanded={open}>
-        {pending ? <RefreshCw size={18} className="animate-spin" /> : <MoreHorizontal size={22} />}
+      <button onClick={() => setOpen((v) => !v)} className="glass lift group flex h-12 w-12 items-center justify-center rounded-full" aria-label="Mais opções" aria-expanded={open}>
+        {pending ? <RefreshCw size={18} className="animate-spin" /> : <MoreHorizontal size={22} className="transition-transform duration-300 group-hover:rotate-90" />}
       </button>
       <AnimatePresence>
         {open && (

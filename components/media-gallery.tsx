@@ -127,9 +127,11 @@ export function TrailerButton({ videoId, title }: { videoId: string; title: stri
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button onClick={() => setOpen(true)} className="glass tap flex h-12 items-center gap-2 rounded-full pl-2 pr-5 text-[15px] font-semibold">
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-black">
-          <Play size={15} className="ml-0.5 fill-current" />
+      <button onClick={() => setOpen(true)} className="glass lift tap group flex h-12 items-center gap-2 rounded-full pl-2 pr-5 text-[15px] font-semibold">
+        <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-white text-black transition-transform duration-300 group-hover:scale-110">
+          {/* Onda saindo do play no hover */}
+          <span className="absolute inset-0 rounded-full bg-white/60 opacity-0 group-hover:animate-ping group-hover:opacity-100" />
+          <Play size={15} className="relative ml-0.5 fill-current" />
         </span>
         Trailer
       </button>

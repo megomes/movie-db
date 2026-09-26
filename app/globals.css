@@ -199,6 +199,158 @@ body {
   opacity: 0.7;
 }
 
+/* Botões de ação (Já vi, Trailer, ♥, …): sobem um pouco, brilham e reagem ao mouse */
+.lift {
+  transition:
+    translate 240ms var(--ease-out),
+    box-shadow 240ms var(--ease-out),
+    background-color 200ms ease;
+}
+/* Reflexo que atravessa o botão; fica numa camada própria pra não cortar o confete */
+.shine {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+.shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 30%, rgb(255 255 255 / 0.38) 50%, transparent 70%);
+  translate: -130% 0;
+}
+@keyframes heartbeat {
+  0%,
+  100% {
+    scale: 1;
+  }
+  14% {
+    scale: 1.22;
+  }
+  28% {
+    scale: 1;
+  }
+  42% {
+    scale: 1.14;
+  }
+  56% {
+    scale: 1;
+  }
+}
+@media (hover: hover) {
+  .lift:hover {
+    translate: 0 -2px;
+  }
+  .lift.btn-accent:hover {
+    box-shadow:
+      0 12px 32px rgb(47 123 255 / 0.5),
+      inset 0 1px 0 rgb(255 255 255 / 0.25);
+  }
+  .lift.glass:hover {
+    background-color: rgb(255 255 255 / 0.12);
+    box-shadow: 0 10px 28px rgb(0 0 0 / 0.45);
+  }
+  :hover > .shine::after {
+    translate: 130% 0;
+    transition: translate 750ms var(--ease-out);
+  }
+  .heart-hover:hover .heartbeat {
+    animation: heartbeat 1.1s ease-in-out infinite;
+  }
+}
+
+/* Mural de pôsteres do login: colunas sobem/descem sem fim (a lista vem duplicada) */
+@keyframes wall-up {
+  to {
+    translate: 0 -50%;
+  }
+}
+.wall-col {
+  animation: wall-up 80s linear infinite;
+  will-change: translate;
+}
+.wall-down {
+  animation-direction: reverse;
+}
+
+/* Tailwind v4 tirou a mãozinha dos botões: devolve pra tudo que é clicável */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  label[for] {
+    cursor: pointer;
+  }
+}
+
+/* "Já vi" no hover: faíscas em volta, selo fica verde e o check se redesenha */
+@keyframes spark {
+  0% {
+    opacity: 0;
+    scale: 0.2;
+    translate: 0 0;
+  }
+  35% {
+    opacity: 1;
+    scale: 1;
+  }
+  100% {
+    opacity: 0;
+    scale: 0.5;
+    translate: var(--dx) var(--dy);
+  }
+}
+@keyframes draw-check {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes badge-pop {
+  0% {
+    scale: 1;
+    rotate: 0deg;
+  }
+  45% {
+    scale: 1.4;
+    rotate: -14deg;
+  }
+  100% {
+    scale: 1.22;
+    rotate: -8deg;
+  }
+}
+.spark {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  font-size: 11px;
+  line-height: 1;
+  color: #ffd166;
+  text-shadow: 0 0 8px rgb(255 209 102 / 0.8);
+}
+.done-check path {
+  stroke-dasharray: 24;
+}
+@media (hover: hover) {
+  .done-btn:hover .spark {
+    animation: spark 1.1s var(--ease-out) infinite;
+    animation-delay: var(--d);
+  }
+  .done-btn:hover .done-badge {
+    background: var(--success);
+    color: #06080d;
+    animation: badge-pop 450ms var(--ease-out) forwards;
+  }
+  .done-btn:hover .done-check path {
+    animation: draw-check 450ms var(--ease-out) 80ms both;
+  }
+}
+
 /* Morph da capa entre lista e detalhe (React ViewTransition) */
 ::view-transition-group(.morph) {
   animation-duration: 420ms;
@@ -218,9 +370,16 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .spark,
+  .wall-col,
+  .heartbeat,
+  .shine::after,
   .ken-burns,
   .rise,
   .shimmer::after {
     animation: none;
+  }
+  .shine {
+    display: none;
   }
 }

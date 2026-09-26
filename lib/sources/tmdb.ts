@@ -63,6 +63,26 @@ export async function searchTmdbMulti(query: string) {
     .map((r) => ({ kind: (r.media_type === "movie" ? "movie" : "series") as TmdbKind, ...toCandidate(r, r.media_type === "movie" ? "movie" : "series") }));
 }
 
+// Pôsteres em alta na semana (mural da tela de login). Cache de 1 dia; sem TMDB, mural vazio.
+export async function trendingPosters(pages = 2) {
+  try {
+    const all = await Promise.all(
+      Array.from({ length: pages }, (_, i) => {
+        const url = new URL(BASE + "/trending/all/week");
+        url.searchParams.set("language", "pt-BR");
+        url.searchParams.set("page", String(i + 1));
+        return fetchJson<{ results: SearchResult[] }>(url.toString(), {
+          headers: { Authorization: `Bearer ${process.env.TMDB_READ_ACCESS_TOKEN}` },
+          next: { revalidate: 86_400 },
+        });
+      }),
+    );
+    return all.flatMap((d) => d.results).flatMap((r) => (r.poster_path ? [tmdbImage(r.poster_path, "w342")!] : []));
+  } catch {
+    return [];
+  }
+}
+
 export async function findByImdbId(imdbId: string) {
   const data = await tmdb<{ movie_results: SearchResult[]; tv_results: SearchResult[] }>(`/find/${imdbId}`, {
     external_source: "imdb_id",

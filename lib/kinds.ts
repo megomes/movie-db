@@ -84,3 +84,5 @@ export function scoreLabel(item: Pick<Item, "kind" | "ratings" | "score">) {
 
 // Semente que muda uma vez por dia (destaques da home)
 export const daySeed = () => Math.floor(Date.now() / 86_400_000) % 997;
+// Semente nova a cada visita (prateleiras que variam sempre)
+export const visitSeed = () => Math.floor(Math.random() * 1e9);

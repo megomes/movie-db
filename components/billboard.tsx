@@ -202,8 +202,9 @@ function Actions({ item, onDraw, compact = false }: { item: LiteItem; onDraw: ()
   const [, start] = useTransition();
   return (
     <div className={`flex items-center gap-2.5 ${compact ? "" : "mt-7"}`}>
-      <Link href={`/item/${item.id}`} className={`btn-accent tap flex items-center gap-2 rounded-full font-semibold ${compact ? "h-11 px-5 text-[14px]" : "h-12 px-7 text-[16px]"}`}>
-        <Info size={18} /> Detalhes
+      <Link href={`/item/${item.id}`} className={`btn-accent lift tap group relative flex items-center gap-2 rounded-full font-semibold ${compact ? "h-11 px-5 text-[14px]" : "h-12 px-7 text-[16px]"}`}>
+        <span className="shine" />
+        <Info size={18} className="transition-transform duration-300 group-hover:scale-110" /> Detalhes
       </Link>
       <motion.button
         whileTap={{ scale: 0.85 }}
@@ -211,16 +212,18 @@ function Actions({ item, onDraw, compact = false }: { item: LiteItem; onDraw: ()
           setPinned((v) => !v);
           start(() => togglePin(item.id).then(() => undefined));
         }}
-        className={`glass flex items-center justify-center rounded-full ${compact ? "h-11 w-11" : "h-12 w-12"}`}
+        className={`glass lift heart-hover group flex items-center justify-center rounded-full ${compact ? "h-11 w-11" : "h-12 w-12"}`}
         aria-label={pinned ? "Tirar de quero muito" : "Quero muito"}
       >
         <motion.span key={String(pinned)} initial={{ scale: 0.4 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 500, damping: 15 }}>
-          <Heart size={20} className={pinned ? "fill-danger text-danger" : ""} />
+          <span className="heartbeat block">
+            <Heart size={20} className={`transition-colors duration-200 ${pinned ? "fill-danger text-danger" : "group-hover:text-danger"}`} />
+          </span>
         </motion.span>
       </motion.button>
       {!compact && (
-        <button onClick={onDraw} className="glass tap flex h-12 items-center gap-2 rounded-full px-5 text-[15px] font-medium">
-          <Dices size={18} /> Sortear outro
+        <button onClick={onDraw} className="glass lift tap group flex h-12 items-center gap-2 rounded-full px-5 text-[15px] font-medium">
+          <Dices size={18} className="transition-transform duration-500 group-hover:rotate-[200deg]" /> Sortear outro
         </button>
       )}
     </div>

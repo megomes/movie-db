@@ -9,7 +9,7 @@ import { displayGenres } from "@/lib/genres";
 import type { Availability, CastMember, Item, Provider } from "@/lib/db/schema";
 import { artSrc, coverSrc } from "@/lib/img";
 import { accessFor, formatMinutes, KIND_META } from "@/lib/kinds";
-import { getItem, listPeople } from "@/lib/queries";
+import { getItem, listPeople, listTags } from "@/lib/queries";
 import { getProfile, requireUser } from "@/lib/session";
 
 export async function generateMetadata({ params }: PageProps<"/item/[id]">) {
@@ -57,7 +57,7 @@ function statsFor(item: Item): Stat[] {
 export default async function ItemPage({ params }: PageProps<"/item/[id]">) {
   const user = await requireUser();
   const { id } = await params;
-  const [item, profile, people] = await Promise.all([getItem(id), getProfile(user.id), listPeople()]);
+  const [item, profile, people, tags] = await Promise.all([getItem(id), getProfile(user.id), listPeople(), listTags(user.id)]);
   if (!item) notFound();
   const mine = item.ownerId === user.id;
   const owner = people.find((p) => p.userId === item.ownerId);
@@ -68,7 +68,11 @@ export default async function ItemPage({ params }: PageProps<"/item/[id]">) {
   const about = item.summary ?? item.overview;
 
   // Categoria do Obsidian agora é tag; aqui ficam só os gêneros das APIs
-  const genres = displayGenres({ ...item, category: null }).slice(0, 4);
+  // (sem repetir o que já aparece como tag, ex.: "Ficção" tag + "Ficção" gênero)
+  const tagNames = new Set(tags.filter((t) => mine && item.tagIds.includes(t.id)).map((t) => t.name.toLowerCase()));
+  const genres = displayGenres({ ...item, category: null })
+    .filter((g) => !tagNames.has(g.toLowerCase()))
+    .slice(0, 4);
   const coverThumb = coverSrc(item.coverUrl, "sm");
 
   return (
@@ -77,7 +81,7 @@ export default async function ItemPage({ params }: PageProps<"/item/[id]">) {
 
       {/* Topo: arte com máscara (sem emenda) e conteúdo alinhado ao pé */}
       <section className="relative">
-        <div className="art-mask absolute inset-x-0 top-0 h-full min-h-[62vh] overflow-hidden lg:min-h-[92vh]">
+        <div className={`art-mask absolute inset-x-0 top-0 h-full overflow-hidden ${art ? "min-h-[62vh] lg:min-h-[92vh]" : ""}`}>
           {art ? (
             <img src={art} alt="" className="ken-burns h-full w-full object-cover" />
           ) : (
@@ -94,7 +98,8 @@ export default async function ItemPage({ params }: PageProps<"/item/[id]">) {
             <ChevronLeft size={20} /> Voltar
           </Link>
 
-          <div className="mt-[26vh] flex flex-col gap-6 lg:mt-[34vh] lg:flex-row lg:items-end lg:gap-12">
+          {/* Com arte de fundo, a capa desce pra deixar a arte aparecer; sem arte, não sobra vão vazio */}
+          <div className={`flex flex-col gap-6 lg:flex-row lg:items-end lg:gap-12 ${art ? "mt-[26vh] lg:mt-[34vh]" : "mt-6 lg:mt-8"}`}>
             <div className="w-[46%] max-w-[220px] shrink-0 lg:w-[260px] lg:max-w-none">
               <div className="rounded-3xl shadow-[0_30px_80px_rgb(0_0_0/0.65)]">
                 <Cover
@@ -262,39 +267,60 @@ function Cast({ title, people }: { title: string; people: CastMember[] }) {
   );
 }
 
-function ProviderIcon({ p, mine }: { p: Provider; mine: boolean }) {
+function ProviderIcon({ p, mine, small = false }: { p: Provider; mine: boolean; small?: boolean }) {
   return (
-    <div className="w-[68px] shrink-0 text-center" title={p.name}>
-      <div className={`relative mx-auto h-[60px] w-[60px] overflow-hidden rounded-[18px] shadow-lg ${mine ? "ring-2 ring-success ring-offset-2 ring-offset-bg" : ""}`}>
+    <div className={`shrink-0 text-center ${small ? "w-[48px] opacity-55 transition-opacity hover:opacity-100" : "w-[68px]"}`} title={p.name}>
+      <div
+        className={`relative mx-auto overflow-hidden shadow-lg ${small ? "h-10 w-10 rounded-xl" : "h-[60px] w-[60px] rounded-[18px]"} ${mine ? "ring-2 ring-success ring-offset-2 ring-offset-bg" : ""}`}
+      >
         {p.logo && <img src={p.logo} alt={p.name} className="h-full w-full object-cover" />}
       </div>
-      <p className="mt-1.5 truncate text-[11px] text-white/60">{p.name}</p>
+      <p className={`mt-1.5 truncate text-white/60 ${small ? "text-[10px]" : "text-[11px]"}`}>{p.name}</p>
     </div>
   );
 }
 
+// Streaming (e grátis) em destaque; alugar/comprar menores e apagados, lado a lado
 function Providers({ availability: a, myProviders }: { availability: Availability; myProviders: number[] }) {
-  const groups: [string, Provider[] | undefined][] = [
-    ["Streaming", a.flatrate],
+  const main: [string, Provider[]][] = [
+    ["Streaming", a.flatrate ?? []],
     ["Grátis", [...(a.free ?? []), ...(a.ads ?? [])]],
-    ["Alugar", a.rent],
-    ["Comprar", a.buy],
   ];
-  const any = groups.some(([, l]) => l?.length);
+  const paid: [string, Provider[]][] = [
+    ["Alugar", a.rent ?? []],
+    ["Comprar", a.buy ?? []],
+  ];
+  const any = [...main, ...paid].some(([, l]) => l.length);
   return (
     <div className="space-y-5">
-      {groups
-        .filter(([, l]) => l?.length)
+      {main
+        .filter(([, l]) => l.length)
         .map(([label, list]) => (
           <div key={label}>
             <p className="mb-2.5 text-[12px] font-semibold uppercase tracking-wider text-white/45">{label}</p>
             <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
-              {list!.map((p) => (
+              {list.map((p) => (
                 <ProviderIcon key={p.id} p={p} mine={myProviders.includes(p.id)} />
               ))}
             </div>
           </div>
         ))}
+      {paid.some(([, l]) => l.length) && (
+        <div className="flex flex-wrap gap-x-10 gap-y-4">
+          {paid
+            .filter(([, l]) => l.length)
+            .map(([label, list]) => (
+              <div key={label} className="min-w-0">
+                <p className="mb-2 text-[10.5px] font-semibold uppercase tracking-wider text-white/30">{label}</p>
+                <div className="no-scrollbar flex gap-1.5 overflow-x-auto">
+                  {list.map((p) => (
+                    <ProviderIcon key={p.id} p={p} mine={myProviders.includes(p.id)} small />
+                  ))}
+                </div>
+              </div>
+            ))}
+        </div>
+      )}
       {!any && <p className="glass rounded-2xl p-4 text-[14px] text-white/70">Nenhum serviço oferece no Brasil por enquanto. O app avisa quando aparecer.</p>}
       {a.link && (
         <a href={a.link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[13px] text-white/55 hover:text-white">

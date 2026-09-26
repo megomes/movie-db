@@ -1,5 +1,5 @@
 import { HomeView } from "@/components/home-view";
-import { daySeed } from "@/lib/kinds";
+import { daySeed, visitSeed } from "@/lib/kinds";
 import { listIdeas } from "@/lib/queries";
 import { requireUser } from "@/lib/session";
 
@@ -9,5 +9,6 @@ export default async function Home() {
   const user = await requireUser();
   // Ideias do backlog das outras pessoas: guiam o primeiro acesso e viram uma prateleira depois
   const ideas = await listIdeas(user.id);
-  return <HomeView seed={daySeed()} ideas={ideas} />;
+  // seed: muda uma vez por dia (destaques); shuffle: muda a cada visita ("Liberado agora")
+  return <HomeView seed={daySeed()} shuffle={visitSeed()} ideas={ideas} />;
 }

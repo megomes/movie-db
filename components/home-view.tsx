@@ -23,7 +23,7 @@ function mix(list: LiteItem[]) {
 }
 
 // Início: sugestões e descoberta. A grade completa fica na Lista.
-export function HomeView({ seed, ideas }: { seed: number; ideas: Ideas }) {
+export function HomeView({ seed, shuffle, ideas }: { seed: number; shuffle: number; ideas: Ideas }) {
   const { items, myProviders, shared } = useBacklog();
 
   const data = useMemo(() => {
@@ -66,14 +66,18 @@ export function HomeView({ seed, ideas }: { seed: number; ideas: Ideas }) {
       { id: "bed", label: "Antes de dormir", hint: "Livro de até 250 páginas", icon: "book", items: take(daily(items.filter((i) => i.kind === "book" && i.pages && i.pages <= 250)), 8) },
     ];
 
-    const available = take(mix(items.filter((i) => accessFor(i, myProviders).tier === "mine" || i.gamePass || (i.steamPrice?.discountPercent ?? 0) >= 30).sort(byScore)), 20);
+    // Sorteio ponderado a cada visita: tudo pode aparecer, mas os melhores (e os ♥) tendem a vir na frente
+    const luck = (id: string) => ([...id].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 2654435761) >>> 0, shuffle >>> 0) % 100000) / 100000 || 0.00001;
+    const weight = (i: LiteItem) => 0.5 + rel(i) + (i.pinned ? 0.8 : 0);
+    const lucky = (list: LiteItem[]) => [...list].sort((a, b) => luck(b.id) ** (1 / weight(b)) - luck(a.id) ** (1 / weight(a)));
+    const available = take(mix(lucky(items.filter((i) => accessFor(i, myProviders).tier === "mine" || i.gamePass || (i.steamPrice?.discountPercent ?? 0) >= 30))), 20);
     const together = shared
       .filter((p) => p.count)
       .map((p) => ({ person: p, items: take(mix(items.filter((i) => p.mineIds.includes(i.id)).sort(byScore)), 20) }));
     const pinned = take(mix(items.filter((i) => i.pinned).sort(byScore)), 20);
 
     return { featured, top, topIds: new Set(top.map((i) => i.id)), buckets, available, together, pinned };
-  }, [items, myProviders, shared, seed]);
+  }, [items, myProviders, shared, seed, shuffle]);
 
   // Poucos itens: a home normal ficaria vazia, então segue no modo "primeiros passos"
   if (items.length < STARTER_GOAL) return <EmptyHome ideas={ideas} />;

@@ -23,7 +23,7 @@ export function GoogleButton() {
           }
         }}
         disabled={pending}
-        className="tap mt-10 flex h-11 w-full max-w-xs items-center justify-center gap-3 rounded-full bg-text text-[15px] font-medium text-bg disabled:opacity-70"
+        className="lift tap mt-7 flex h-[52px] w-full items-center justify-center gap-3 rounded-full bg-white text-[16px] font-semibold text-black shadow-[0_12px_32px_rgb(0_0_0/0.35)] hover:bg-white/90 hover:shadow-[0_16px_40px_rgb(47_123_255/0.35)] disabled:opacity-70"
       >
         {pending ? (
           <Loader2 size={20} className="animate-spin" />
