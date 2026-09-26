@@ -1,9 +1,11 @@
+/* eslint-disable @next/next/no-img-element -- capas externas */
 "use client";
 
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { CalendarCheck, CircleCheckBig, Flame, Lock, Zap } from "lucide-react";
+import { CalendarCheck, Check, CircleCheckBig, Flame, Lock, Plus, Zap } from "lucide-react";
 import type { Kind } from "@/lib/db/schema";
+import { coverSrc } from "@/lib/img";
 import { ptGenre } from "@/lib/genres";
 import { KIND_META, KINDS } from "@/lib/kinds";
 import type { LiteItem } from "@/lib/queries";
@@ -63,7 +65,7 @@ function useStats(list: LiteItem[]) {
 
 export function DoneStats({ list, kind }: { list: LiteItem[]; kind: Kind | "all" }) {
   const s = useStats(list);
-  if (list.length < MIN) return <StatsSkeleton have={list.length} />;
+  if (list.length < MIN) return <StatsSkeleton list={list} />;
 
   const best = s.weekday.indexOf(Math.max(...s.weekday));
   const hours = Math.round((s.movieMin + s.gameMin) / 60);
@@ -136,10 +138,10 @@ function Tile({ icon: Icon, value, label, tone }: { icon: typeof Zap; value: str
 
 function Card({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <section className="glass rounded-3xl p-4 lg:p-5">
+    <section className="glass flex flex-col rounded-3xl p-4 lg:p-5">
       <h3 className="text-[16px] font-bold tracking-tight">{title}</h3>
       {subtitle && <p className="text-[12.5px] text-text-2">{subtitle}</p>}
-      <div className="mt-4">{children}</div>
+      <div className="mt-4 flex min-h-0 flex-1 flex-col">{children}</div>
     </section>
   );
 }
@@ -149,17 +151,18 @@ function MonthChart({ months, kind }: { months: ReturnType<typeof useStats>["mon
   const [hover, setHover] = useState<number | null>(null);
   const max = Math.max(1, ...months.map((m) => m.total));
   const kindsShown = kind === "all" ? KINDS.filter((k) => months.some((m) => m.byKind.find((b) => b.kind === k)!.n)) : [kind];
-  const h = 150;
+  // Altura flexível: preenche o cartão (mín. 170px), barras em % da área do gráfico
   return (
-    <div>
-      <div className="relative flex items-end gap-1.5" style={{ height: h + 22 }} onMouseLeave={() => setHover(null)}>
+    <div className="flex flex-1 flex-col">
+      <div className="relative flex min-h-[170px] flex-1 items-stretch gap-1.5" onMouseLeave={() => setHover(null)}>
         {/* grade recessiva */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 border-t border-dashed border-white/10" style={{ height: h }}>
+        <div className="pointer-events-none absolute inset-x-0 bottom-[22px] top-0 border-t border-dashed border-white/10">
           <span className="absolute -top-2.5 right-0 bg-transparent text-[10px] text-white/35">{max}</span>
         </div>
         {months.map((m, i) => (
-          <div key={i} className="relative flex h-full flex-1 flex-col items-center justify-end" onMouseEnter={() => setHover(i)} onClick={() => setHover(i)}>
-            <div className="flex w-full max-w-[26px] flex-col-reverse gap-[2px]" style={{ height: (m.total / max) * h }}>
+          <div key={i} className="relative flex flex-1 flex-col items-center" onMouseEnter={() => setHover(i)} onClick={() => setHover(i)}>
+            <div className="flex w-full flex-1 flex-col items-center justify-end">
+            <div className="flex w-full max-w-[28px] flex-col-reverse gap-[2px]" style={{ height: `${(m.total / max) * 100}%` }}>
               {m.byKind
                 .filter((b) => b.n)
                 .map((b, j, arr) => (
@@ -173,7 +176,8 @@ function MonthChart({ months, kind }: { months: ReturnType<typeof useStats>["mon
                   />
                 ))}
             </div>
-            <span className={`mt-1.5 text-[10px] ${hover === i ? "text-white" : "text-white/45"}`}>{monthShort.format(m.date).replace(".", "")}</span>
+            </div>
+            <span className={`mt-1.5 h-[14px] text-[10px] leading-[14px] ${hover === i ? "text-white" : "text-white/45"}`}>{monthShort.format(m.date).replace(".", "")}</span>
             {hover === i && m.total > 0 && (
               <div className={`glass-strong pointer-events-none absolute bottom-full z-10 mb-1 w-max rounded-xl px-3 py-2 text-[12px] ${i > 8 ? "right-0" : i < 3 ? "left-0" : "left-1/2 -translate-x-1/2"}`}>
                 <p className="font-semibold capitalize">{monthLong.format(m.date)}</p>
@@ -285,65 +289,112 @@ function GenreBars({ genres }: { genres: [string, number][] }) {
   );
 }
 
-// Poucos dados: esqueleto dos gráficos + explicação ilustrada
-function StatsSkeleton({ have }: { have: number }) {
+// Poucos dados: prévia nítida do que vem (sem borrão), com as capas já marcadas preenchendo os espaços
+function StatsSkeleton({ list }: { list: LiteItem[] }) {
+  const have = list.length;
   const missing = MIN - have;
   return (
-    <div className="relative overflow-hidden rounded-3xl">
-      <div aria-hidden className="pointer-events-none grid select-none gap-3 opacity-40 blur-[1.5px] lg:grid-cols-[1.5fr_1fr]">
-        <div className="glass rounded-3xl p-5">
-          <div className="h-4 w-24 rounded bg-white/10" />
-          <div className="mt-5 flex h-[140px] items-end gap-1.5">
-            {[30, 55, 20, 70, 45, 90, 60, 35, 80, 50, 65, 100].map((v, i) => (
-              <div key={i} className="shimmer relative flex-1 overflow-hidden rounded-t-[4px] bg-white/10" style={{ height: `${v}%` }} />
-            ))}
+    <div className="glass relative overflow-hidden rounded-[28px] p-5 lg:p-7">
+      <div className="pointer-events-none absolute -left-16 -top-24 h-64 w-64 rounded-full bg-accent/20 blur-[90px]" />
+      <div className="relative grid gap-7 lg:grid-cols-[1fr_1.15fr] lg:items-center lg:gap-10">
+        <div>
+          <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-accent-2">Estatísticas</p>
+          <h3 className="mt-2 text-[24px] font-bold leading-tight tracking-tight lg:text-[30px]">
+            {missing === MIN ? "Marque 5 coisas como vistas" : `Faltam ${missing} pra liberar`}
+          </h3>
+          <p className="mt-2 max-w-md text-[14px] leading-relaxed text-text-2">
+            Aí aparecem o seu ano mês a mês, o dia da semana em que você mais termina coisas, seus gêneros favoritos e umas curiosidades.
+          </p>
+
+          {/* 5 espaços: capas do que já foi visto + vagas tracejadas */}
+          <div className="mt-5 flex gap-2.5">
+            {Array.from({ length: MIN }, (_, i) => {
+              const it = list[i];
+              return it ? (
+                <motion.div
+                  key={it.id}
+                  initial={{ y: 12, opacity: 0, rotate: -4 }}
+                  animate={{ y: 0, opacity: 1, rotate: 0 }}
+                  transition={{ delay: i * 0.08, type: "spring", stiffness: 300, damping: 20 }}
+                  className="relative h-[84px] w-[58px] shrink-0 overflow-hidden rounded-xl bg-bg-3 shadow-[0_10px_24px_rgb(0_0_0/0.45)] ring-1 ring-white/10 lg:h-[96px] lg:w-[66px]"
+                >
+                  {it.coverUrl && <img src={coverSrc(it.coverUrl, "sm")!} alt={it.title} className="h-full w-full object-cover" />}
+                  <span className="absolute bottom-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-success text-black ring-2 ring-bg">
+                    <Check size={11} strokeWidth={3.5} />
+                  </span>
+                </motion.div>
+              ) : (
+                <div
+                  key={i}
+                  className={`flex h-[84px] w-[58px] shrink-0 items-center justify-center rounded-xl border-2 border-dashed lg:h-[96px] lg:w-[66px] ${i === have ? "slot-next border-accent/60 text-accent-2" : "border-white/12 text-white/25"}`}
+                >
+                  <Plus size={18} />
+                </div>
+              );
+            })}
           </div>
+          <p className="mt-3 text-[12.5px] text-text-2">
+            <span className="font-semibold text-white">{have}</span> de {MIN} · toque em “Já vi” num item do backlog
+          </p>
         </div>
-        <div className="grid gap-3">
-          <div className="glass rounded-3xl p-5">
-            <div className="h-4 w-32 rounded bg-white/10" />
-            <div className="shimmer relative mt-5 h-4 overflow-hidden rounded bg-white/10" />
-          </div>
-          <div className="glass rounded-3xl p-5">
-            <div className="h-4 w-28 rounded bg-white/10" />
-            <div className="mt-4 flex h-[60px] items-end gap-2">
-              {[40, 70, 30, 55, 90, 60, 45].map((v, i) => (
-                <div key={i} className="shimmer relative flex-1 overflow-hidden rounded-t-[4px] bg-white/10" style={{ height: `${v}%` }} />
+
+        {/* Prévias dos gráficos: traço fino e nítido, apagadas e com cadeado */}
+        <div className="grid grid-cols-2 gap-2.5">
+          <Teaser title="Seu ano">
+            <div className="flex h-full items-end gap-[3px]">
+              {[3, 5, 2, 6, 4, 8, 5, 3, 7, 4, 6, 9].map((v, i) => (
+                <div key={i} className="flex-1 rounded-t-[3px] bg-white/[0.14]" style={{ height: `${v * 10}%` }} />
               ))}
             </div>
-          </div>
+          </Teaser>
+          <Teaser title="Seu dia">
+            <div className="flex h-full items-end gap-1.5">
+              {[3, 5, 4, 4, 5, 3, 8].map((v, i) => (
+                <div key={i} className={`flex-1 rounded-t-[3px] ${i === 6 ? "bg-accent/70" : "bg-white/[0.14]"}`} style={{ height: `${v * 11}%` }} />
+              ))}
+            </div>
+          </Teaser>
+          <Teaser title="Divisão por tipo">
+            <div className="flex h-full flex-col justify-center gap-2.5">
+              <div className="flex h-2.5 gap-[2px] overflow-hidden rounded-full">
+                {KINDS.map((k, i) => (
+                  <div key={k} style={{ flex: [4, 1, 2, 3][i], background: KIND_COLOR[k], opacity: 0.55 }} />
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                {KINDS.map((k) => (
+                  <div key={k} className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full" style={{ background: KIND_COLOR[k], opacity: 0.7 }} />
+                    <span className="h-1.5 flex-1 rounded-full bg-white/[0.1]" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Teaser>
+          <Teaser title="Curiosidades">
+            <div className="flex h-full flex-col justify-center gap-2">
+              {["🍿", "🎮", "📚"].map((e, i) => (
+                <div key={e} className="flex items-center gap-2">
+                  <span className="text-[15px] leading-none opacity-80">{e}</span>
+                  <span className="h-1.5 rounded-full bg-white/[0.12]" style={{ width: `${[70, 52, 62][i]}%` }} />
+                </div>
+              ))}
+            </div>
+          </Teaser>
         </div>
       </div>
-      <div className="absolute inset-0 flex items-center justify-center p-4">
-        <div className="glass-strong max-w-sm rounded-3xl p-6 text-center shadow-[0_30px_80px_rgb(0_0_0/0.5)]">
-          <div className="relative mx-auto h-16 w-24">
-            {["🍿", "🎮", "📚"].map((e, i) => (
-              <motion.span
-                key={e}
-                className="absolute top-2 text-[34px]"
-                style={{ left: i * 26 }}
-                animate={{ y: [0, -6, 0] }}
-                transition={{ duration: 2, repeat: Infinity, delay: i * 0.3, ease: "easeInOut" }}
-              >
-                {e}
-              </motion.span>
-            ))}
-            <span className="absolute -right-2 -top-1 flex h-7 w-7 items-center justify-center rounded-full bg-bg-3 ring-2 ring-white/10">
-              <Lock size={13} />
-            </span>
-          </div>
-          <h3 className="mt-3 text-[18px] font-bold">Suas estatísticas estão quase aí</h3>
-          <p className="mt-1.5 text-[13.5px] leading-relaxed text-text-2">
-            Com {MIN} coisas marcadas como vistas, aparecem o seu ano mês a mês, o dia da semana em que você mais termina coisas, seus gêneros e umas curiosidades.
-          </p>
-          <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
-            <motion.div className="h-full rounded-full bg-success" initial={{ width: 0 }} animate={{ width: `${(have / MIN) * 100}%` }} transition={{ duration: 0.8 }} />
-          </div>
-          <p className="mt-2 text-[12.5px] font-medium text-white/70">
-            {have} de {MIN} · {missing === 1 ? "falta 1" : `faltam ${missing}`}
-          </p>
-        </div>
+    </div>
+  );
+}
+
+function Teaser({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="relative rounded-2xl bg-white/[0.03] p-3.5 ring-1 ring-white/[0.07]">
+      <div className="flex items-center justify-between">
+        <span className="text-[12px] font-semibold text-white/55">{title}</span>
+        <Lock size={12} className="text-white/35" />
       </div>
+      <div className="mt-3 h-[64px] lg:h-[76px]">{children}</div>
     </div>
   );
 }

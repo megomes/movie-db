@@ -444,6 +444,20 @@ body {
   }
 }
 
+/* Próxima vaga do esqueleto de estatísticas: pulsa de leve */
+@keyframes slot-next {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(47 123 255 / 0);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgb(47 123 255 / 0.18);
+  }
+}
+.slot-next {
+  animation: slot-next 2.2s ease-in-out infinite;
+}
+
 /* Morph da capa entre lista e detalhe (React ViewTransition) */
 ::view-transition-group(.morph) {
   animation-duration: 420ms;
@@ -463,6 +477,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .slot-next,
   .add-glow,
   .slot-idle,
   .slot-hover,
