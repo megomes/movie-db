@@ -19,13 +19,6 @@ function useKindsWithItems() {
   return <T extends { kind?: string }>(list: T[]) => list.filter((s) => !s.kind || kinds.has(s.kind));
 }
 
-const SECTIONS: { href: string; kind?: string; label: string; match: (p: string, k: string | null) => boolean }[] = [
-  { href: "/", label: "Início", match: (p: string) => p === "/" },
-  { href: "/lista?k=movie", kind: "movie", label: "Filmes", match: (p: string, k: string | null) => p === "/lista" && k === "movie" },
-  { href: "/lista?k=series", kind: "series", label: "Séries", match: (p: string, k: string | null) => p === "/lista" && k === "series" },
-  { href: "/lista?k=game", kind: "game", label: "Jogos", match: (p: string, k: string | null) => p === "/lista" && k === "game" },
-  { href: "/lista?k=book", kind: "book", label: "Livros", match: (p: string, k: string | null) => p === "/lista" && k === "book" },
-];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -69,16 +62,17 @@ function TopBar() {
       >
         <Link href="/" className="flex items-center gap-2.5 pl-1">
           <img src="/icons/icon-192.png" alt="" className="h-9 w-9 rounded-[10px]" />
-          <span className="text-[17px] font-semibold tracking-tight">Backlog</span>
+          <span className="hidden text-[17px] font-semibold tracking-tight xl:inline">Backlog</span>
         </Link>
 
         <nav className="flex items-center gap-1 rounded-full bg-white/[0.04] p-1">
-          {withItems(SECTIONS).map((s) => {
+          {withItems(NAV).map((s) => {
             const active = s.match(pathname, k);
             return (
               <Link
                 key={s.href}
                 href={s.href}
+                title={s.label}
                 onClick={(e) => {
                   // Já na Lista: troca a divisão só no cliente (instantâneo, sem ir ao servidor nem animar a grade toda)
                   if (pathname === "/lista" && s.href.startsWith("/lista")) {
@@ -87,16 +81,26 @@ function TopBar() {
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   }
                 }}
-                className="relative rounded-full px-4 py-1.5 text-[14px] font-medium"
+                className="relative rounded-full px-3.5 py-1.5 text-[14px] font-medium"
               >
                 {active && (
                   <motion.span layoutId="top-pill" className="btn-accent absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 34 }} />
                 )}
-                <span className={`relative transition-colors ${active ? "text-white" : "text-white/70 hover:text-white"}`}>{s.label}</span>
+                <span className={`relative flex items-center gap-1.5 transition-colors ${active ? "text-white" : "text-white/70 hover:text-white"}`}>
+                  <s.icon size={16} strokeWidth={active ? 2.3 : 1.9} /> <span className="hidden xl:inline">{s.label}</span>
+                </span>
               </Link>
             );
           })}
           <span className="mx-1 h-5 w-px bg-white/15" />
+          <Link href="/juntos" title="Juntos" className="relative rounded-full px-3.5 py-1.5 text-[14px] font-medium">
+            {pathname === "/juntos" && (
+              <motion.span layoutId="top-pill" className="btn-accent absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 34 }} />
+            )}
+            <span className={`relative flex items-center gap-1.5 transition-colors ${pathname === "/juntos" ? "text-white" : "text-white/70 hover:text-white"}`}>
+              <HeartHandshake size={16} strokeWidth={pathname === "/juntos" ? 2.3 : 1.9} /> <span className="hidden xl:inline">Juntos</span>
+            </span>
+          </Link>
           <PeopleSwitch />
         </nav>
 
@@ -105,7 +109,7 @@ function TopBar() {
             onClick={() => setSearchOpen(true)}
             className="tap flex h-10 items-center gap-2 rounded-full bg-white/[0.06] px-3.5 text-[13px] text-white/70 hover:bg-white/10 hover:text-white"
           >
-            <Search size={16} /> Buscar <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/60">Ctrl K</kbd>
+            <Search size={16} /> <span className="hidden xl:inline">Buscar</span> <kbd className="hidden rounded bg-white/10 xl:inline px-1.5 py-0.5 text-[10px] text-white/60">Ctrl K</kbd>
           </button>
           {items.length > 0 && (
             <button
@@ -183,7 +187,7 @@ function AvatarMenu() {
   );
 }
 
-const DOCK: { href: string; kind?: string; label: string; icon: typeof House; match: (p: string, k: string | null) => boolean }[] = [
+const NAV: { href: string; kind?: string; label: string; icon: typeof House; match: (p: string, k: string | null) => boolean }[] = [
   { href: "/", label: "Início", icon: House, match: (p: string) => p === "/" },
   { href: "/lista?k=movie", kind: "movie", label: "Filmes", icon: Clapperboard, match: (p: string, k: string | null) => p === "/lista" && k === "movie" },
   { href: "/lista?k=series", kind: "series", label: "Séries", icon: Tv, match: (p: string, k: string | null) => p === "/lista" && k === "series" },
@@ -199,7 +203,7 @@ function Dock() {
   const { me, reviewCount } = useBacklog();
   const withItems = useKindsWithItems();
   const [menu, setMenu] = useState(false);
-  const menuActive = ["/ajustes", "/revisar", "/juntos", ...(withItems(DOCK).length < DOCK.length ? [] : ["/adicionar"])].some((p) => pathname.startsWith(p)) || pathname.startsWith("/pessoa");
+  const menuActive = ["/ajustes", "/revisar", "/juntos", ...(withItems(NAV).length < NAV.length ? [] : ["/adicionar"])].some((p) => pathname.startsWith(p)) || pathname.startsWith("/pessoa");
 
   return (
     <>
@@ -209,7 +213,7 @@ function Dock() {
         className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-center px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] lg:hidden"
       >
         <ul className="glass-nav flex w-full max-w-md items-center rounded-full p-1">
-          {withItems(DOCK).map(({ href, label, icon: Icon, match }) => {
+          {withItems(NAV).map(({ href, label, icon: Icon, match }) => {
             const active = match(pathname, k);
             return (
               <li key={href} className="flex-1">
@@ -232,7 +236,7 @@ function Dock() {
             );
           })}
           {/* Sobrou espaço (poucos tipos no backlog): atalho pra adicionar */}
-          {withItems(DOCK).length < DOCK.length && (
+          {withItems(NAV).length < NAV.length && (
             <li className="flex-1">
               <Link href="/adicionar" aria-label="Adicionar" className="relative flex h-12 w-full items-center justify-center rounded-full">
                 {pathname === "/adicionar" && <motion.span layoutId="dock-blob" className="btn-accent absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 32 }} />}
@@ -302,15 +306,15 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
                 <Plus size={21} /> Adicionar
               </Link>
             </div>
-            {shared.some((p) => p.count) && (
-              <Link href="/juntos" className={row}>
-                <span className={icon}>
-                  <HeartHandshake size={19} />
-                </span>
-                <span className="flex-1">Juntos</span>
-                <span className="text-[13px] text-white/45">{shared.reduce((s, p) => s + p.count, 0)} em comum</span>
-              </Link>
-            )}
+            <Link href="/juntos" className={row}>
+              <span className={icon}>
+                <HeartHandshake size={19} />
+              </span>
+              <span className="flex-1">Juntos</span>
+              <span className="text-[13px] text-white/45">
+                {shared.some((p) => p.count) ? `${shared.reduce((s, p) => s + p.count, 0)} em comum` : shared.length ? "" : "Convide alguém"}
+              </span>
+            </Link>
             {shared.map((p) => (
               <Link key={p.userId} href={`/pessoa/${p.userId}`} className={row}>
                 <span className={`${icon} overflow-hidden`}>{p.image ? <img src={p.image} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" /> : <Eye size={19} />}</span>

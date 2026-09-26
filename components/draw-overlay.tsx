@@ -28,17 +28,23 @@ const TIMES = [
 
 type Phase = "setup" | "spinning" | "result";
 
-function weightOf(i: LiteItem) {
-  let w = Math.max(0.4, ((i.score ?? 6.5) - 4) ** 2);
+// Peso pela nota relativa ao próprio tipo (jogos têm notas cruas mais altas e dominariam o sorteio)
+function weightOf(i: LiteItem, rel: number) {
+  let w = 0.4 + 3 * rel ** 2;
   if (i.pinned) w *= 2.5;
   if (i.priority != null) w *= 1.3;
   return w;
 }
 
 function pickWeighted(pool: LiteItem[]) {
-  const total = pool.reduce((s, i) => s + weightOf(i), 0);
-  let r = Math.random() * total;
-  return pool.find((i) => (r -= weightOf(i)) <= 0) ?? pool[pool.length - 1];
+  const rank = new Map<string, number>();
+  for (const kind of new Set(pool.map((i) => i.kind))) {
+    const scored = pool.filter((i) => i.kind === kind && i.score != null).sort((a, b) => a.score! - b.score!);
+    scored.forEach((i, idx) => rank.set(i.id, scored.length > 1 ? idx / (scored.length - 1) : 0.5));
+  }
+  const weights = pool.map((i) => weightOf(i, rank.get(i.id) ?? 0.4));
+  let r = Math.random() * weights.reduce((s, w) => s + w, 0);
+  return pool.find((_, idx) => (r -= weights[idx]) <= 0) ?? pool[pool.length - 1];
 }
 
 const preload = (src: string | null) =>

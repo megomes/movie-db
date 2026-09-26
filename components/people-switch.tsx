@@ -26,7 +26,7 @@ export function PeopleSwitch({ align = "center" }: { align?: "center" | "right" 
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   if (!shared.length) return null;
-  const active = pathname.startsWith("/pessoa") || pathname === "/juntos";
+  const active = pathname.startsWith("/pessoa");
   const common = shared.reduce((s, p) => s + p.count, 0);
 
   return (
@@ -46,7 +46,7 @@ export function PeopleSwitch({ align = "center" }: { align?: "center" | "right" 
             </motion.span>
           ))}
         </span>
-        {shared.length === 1 ? shared[0].name?.split(" ")[0] : "Pessoas"}
+        <span className="lg:hidden xl:inline">{shared.length === 1 ? shared[0].name?.split(" ")[0] : "Pessoas"}</span>
         <ChevronDown size={14} className={`transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 

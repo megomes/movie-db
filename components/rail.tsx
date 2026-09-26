@@ -91,7 +91,7 @@ export function TopTen({ items, morphIds }: { items: LiteItem[]; morphIds?: Set<
   if (items.length < 3) return null;
   return (
     <section className="rise">
-      <RailHeader title="Top 10 do seu backlog" subtitle="Maiores notas entre tudo que você quer ver" />
+      <RailHeader title="Top 10 do seu backlog" subtitle="Os mais bem avaliados de cada tipo" />
       <div className="group/rail relative">
         <div ref={ref} className={`no-scrollbar flex snap-x snap-mandatory gap-1 overflow-x-auto overflow-y-hidden pb-3 pt-4 ${GUTTER}`}>
           {items.slice(0, 10).map((i, idx) => (
