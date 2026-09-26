@@ -21,12 +21,16 @@ function useKindsWithItems() {
 }
 
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, footer }: { children: React.ReactNode; footer?: React.ReactNode }) {
   return (
     <>
       <div className="ambient pointer-events-none fixed inset-x-0 top-0 -z-10 h-[90vh]" />
       <TopBar />
-      <main className="min-h-dvh pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:pb-16">{children}</main>
+      {/* Rodapé sempre no fim da página, mesmo em páginas curtas */}
+      <main className="flex min-h-dvh flex-col pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:pb-8">
+        <div className="flex-1">{children}</div>
+        {footer}
+      </main>
       <Dock />
       <DrawOverlay />
       <SearchPalette />

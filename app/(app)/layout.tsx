@@ -1,5 +1,7 @@
 import { AppShell } from "@/components/app-shell";
 import { BacklogProvider } from "@/components/backlog-context";
+import { SiteFooter } from "@/components/site-footer";
+import { visitSeed } from "@/lib/kinds";
 import { countDone, listItems, listPeople, listShared, listTags, toLite } from "@/lib/queries";
 import { getProfile, requireUser } from "@/lib/session";
 
@@ -30,7 +32,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       shared={shared}
       doneCount={doneCount}
     >
-      <AppShell>{children}</AppShell>
+      <AppShell footer={<SiteFooter seed={visitSeed()} />}>{children}</AppShell>
     </BacklogProvider>
   );
 }
