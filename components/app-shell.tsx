@@ -27,7 +27,7 @@ export function AppShell({ children, footer }: { children: React.ReactNode; foot
       <div className="ambient pointer-events-none fixed inset-x-0 top-0 -z-10 h-[90vh]" />
       <TopBar />
       {/* Rodapé sempre no fim da página, mesmo em páginas curtas */}
-      <main className="flex min-h-dvh flex-col pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:pb-8">
+      <main className={`flex min-h-dvh flex-col ${footer ? "" : "pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:pb-8"}`}>
         <div className="flex-1">{children}</div>
         {footer}
       </main>

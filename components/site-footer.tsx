@@ -15,11 +15,14 @@ function hoursOf(i: LiteItem) {
   return ((i.pages ?? 300) * 1.3) / 60; // ~1,3 min por página
 }
 
+const Sep = () => <span className="text-white/20">·</span>;
+const B = ({ children }: { children: React.ReactNode }) => <b className="font-semibold text-white/75">{children}</b>;
+
 const fmt = (n: number) => Math.round(n).toLocaleString("pt-BR");
 
 // Rodapé pessoal: números vivos do backlog e o "dado" desta visita
 export function SiteFooter({ seed }: { seed: number }) {
-  const { items, me, doneCount, shared } = useBacklog();
+  const { items, doneCount, shared } = useBacklog();
 
   const facts = useMemo(() => {
     const hours = items.reduce((s, i) => s + hoursOf(i), 0);
@@ -29,73 +32,50 @@ export function SiteFooter({ seed }: { seed: number }) {
     return { hours, pick, common, partner };
   }, [items, shared, seed]);
 
-  const first = me.name?.split(" ")[0] ?? "você";
-
   return (
-    <footer className="mx-auto mt-20 w-full max-w-[1600px] px-4 pb-6 sm:px-6 lg:px-10">
-      <div className="border-t border-white/[0.07] pt-6">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-          {/* Assinatura */}
-          <div className="flex items-center gap-3">
-            <img src="/icons/icon-192.png" alt="" className="h-10 w-10 rounded-xl" />
-            <div>
-              <p className="text-[15px] font-semibold tracking-tight">Backlog</p>
-              <p className="text-[12.5px] text-text-3">Feito em casa pra ver mais e rolar menos. 🍿</p>
-            </div>
-          </div>
-
-          {/* Números vivos */}
-          {items.length > 0 && (
-            <ul className="grid gap-2.5 text-[13px] text-text-2 sm:grid-cols-2 lg:max-w-[760px] lg:gap-x-8">
-              <li className="flex items-start gap-2">
-                <Hourglass size={15} className="mt-0.5 shrink-0 text-white/40" />
-                <span>
-                  Zerar os <b className="font-semibold text-white/85">{fmt(items.length)}</b> itens levaria{" "}
-                  <b className="font-semibold text-white/85">{fmt(facts.hours / 24)} dias</b> sem dormir, ou uns{" "}
-                  <b className="font-semibold text-white/85">{(facts.hours / 2 / 365).toFixed(1).replace(".", ",")} anos</b> a 2h por dia.
+    // Faixa de ponta a ponta, mais escura, com o conteúdo na coluna central
+    <footer className="mt-20 border-t border-white/[0.06] bg-black/35 pb-[calc(6.5rem+env(safe-area-inset-bottom))] lg:pb-0">
+      <div className="mx-auto flex max-w-[1600px] flex-col gap-3 px-4 py-5 text-[12px] leading-relaxed text-text-3 sm:px-6 lg:flex-row lg:items-center lg:gap-6 lg:px-10">
+        <p className="flex shrink-0 items-center gap-2">
+          <img src="/icons/icon-192.png" alt="" className="h-5 w-5 rounded-md opacity-80" />
+          <span className="font-semibold text-white/60">Backlog</span>
+          <Sep />
+          <span>feito em casa pra ver mais e rolar menos 🍿</span>
+        </p>
+        {items.length > 0 && (
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 lg:ml-auto lg:justify-end lg:text-right">
+            <span className="inline-flex items-center gap-1.5">
+              <Hourglass size={12} className="text-white/35" />
+              zerar tudo: <B>{fmt(facts.hours / 24)} dias</B> sem dormir, ou <B>{(facts.hours / 2 / 365).toFixed(1).replace(".", ",")} anos</B> a 2h/dia
+            </span>
+            {facts.pick && (
+              <>
+                <Sep />
+                <span className="inline-flex items-center gap-1.5">
+                  <Dices size={12} className="text-white/35" />
+                  o dado diz{" "}
+                  <Link href={`/item/${facts.pick.id}`} className="font-semibold text-accent-2 hover:underline">
+                    {facts.pick.title}
+                  </Link>
                 </span>
-              </li>
-              {facts.pick && (
-                <li className="flex items-start gap-2">
-                  <Dices size={15} className="mt-0.5 shrink-0 text-white/40" />
-                  <span>
-                    O dado desta visita diz:{" "}
-                    <Link href={`/item/${facts.pick.id}`} className="font-semibold text-accent-2 hover:underline">
-                      {facts.pick.title}
-                    </Link>
-                    . Vai encarar, {first}?
-                  </span>
-                </li>
-              )}
-              <li className="flex items-start gap-2">
-                <CircleCheckBig size={15} className="mt-0.5 shrink-0 text-white/40" />
-                <span>
-                  {doneCount ? (
-                    <>
-                      <Link href="/vistos" className="font-semibold text-white/85 hover:underline">
-                        {fmt(doneCount)} {doneCount === 1 ? "visto" : "vistos"}
-                      </Link>{" "}
-                      até agora. Cada um tirado da pilha com orgulho.
-                    </>
-                  ) : (
-                    <>Nenhum visto ainda. O primeiro “Já vi” é o mais gostoso.</>
-                  )}
-                </span>
-              </li>
-              {facts.common > 0 && (
-                <li className="flex items-start gap-2">
-                  <HeartHandshake size={15} className="mt-0.5 shrink-0 text-white/40" />
-                  <span>
-                    <Link href="/juntos" className="font-semibold text-white/85 hover:underline">
-                      {fmt(facts.common)} em comum
-                    </Link>{" "}
-                    com {facts.partner ?? "a outra pessoa"}. Assunto pra sexta à noite não falta.
-                  </span>
-                </li>
-              )}
-            </ul>
-          )}
-        </div>
+              </>
+            )}
+            <Sep />
+            <Link href="/vistos" className="inline-flex items-center gap-1.5 hover:text-white">
+              <CircleCheckBig size={12} className="text-white/35" />
+              <B>{fmt(doneCount)}</B> {doneCount === 1 ? "visto" : "vistos"}
+            </Link>
+            {facts.common > 0 && (
+              <>
+                <Sep />
+                <Link href="/juntos" className="inline-flex items-center gap-1.5 hover:text-white">
+                  <HeartHandshake size={12} className="text-white/35" />
+                  <B>{fmt(facts.common)}</B> em comum com {facts.partner ?? "a outra pessoa"}
+                </Link>
+              </>
+            )}
+          </p>
+        )}
       </div>
     </footer>
   );
