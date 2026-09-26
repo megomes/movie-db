@@ -16,7 +16,7 @@ export const firstName = (name: string | null) => name?.split(" ")[0] ?? "algué
 
 // Prateleira com o melhor do backlog das outras pessoas: um toque em "+" traz pro seu, sem sair da página
 export function IdeasRail({ ideas, title, subtitle }: { ideas: Ideas; title?: string; subtitle?: string }) {
-  const { ref, by } = useRailScroll();
+  const { ref, by, edges } = useRailScroll();
   const { ask, picker } = useTagAsk();
   if (!ideas.items.length) return null;
   const solo = ideas.from.length === 1 ? ideas.from[0] : null;
@@ -62,7 +62,7 @@ export function IdeasRail({ ideas, title, subtitle }: { ideas: Ideas; title?: st
             ))}
           </AnimatePresence>
         </div>
-        <Arrows by={by} />
+        <Arrows by={by} edges={edges} />
       </div>
     </section>
   );

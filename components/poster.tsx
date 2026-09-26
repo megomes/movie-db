@@ -34,7 +34,7 @@ export function Poster({
   const my = useMotionValue(0);
   const rx = useSpring(useTransform(my, [-0.5, 0.5], [7, -7]), { stiffness: 260, damping: 20 });
   const ry = useSpring(useTransform(mx, [-0.5, 0.5], [-9, 9]), { stiffness: 260, damping: 20 });
-  const glare = useTransform(mx, (x) => `radial-gradient(circle at ${(x + 0.5) * 100}% 20%, rgb(255 255 255 / 0.35), transparent 55%)`);
+  const glare = useTransform(mx, (x) => `radial-gradient(circle at ${(x + 0.5) * 100}% 20%, rgb(255 255 255 / 0.16), transparent 55%)`);
 
   const score = scoreLabel(item);
   const access = accessFor(item, myProviders);
@@ -43,7 +43,7 @@ export function Poster({
   return (
     <Link
       href={href ?? `/item/${item.id}`}
-      className="group relative block outline-none [perspective:800px]"
+      className="group relative block outline-none hover:z-10"
       aria-label={item.title}
       onPointerMove={(e) => {
         if (e.pointerType !== "mouse") return;
@@ -57,40 +57,42 @@ export function Poster({
       }}
     >
       <motion.div
-        // Sem preserve-3d: o cartão inclina como uma peça só (evita as camadas "brigarem" e piscarem)
-        style={{ rotateX: rx, rotateY: ry }}
-        className="relative overflow-hidden rounded-2xl transition-[scale,box-shadow] duration-300 group-hover:z-10 group-hover:scale-[1.04] group-hover:shadow-[0_18px_50px_rgb(0_0_0/0.6)] group-focus-visible:ring-2 group-focus-visible:ring-accent group-active:scale-[0.97]"
+        // Sem preserve-3d: o cartão inclina como uma peça só (evita as camadas "brigarem" e piscarem).
+        // Perspectiva dentro do próprio transform: com "perspective" no pai, o Firefox erra a origem
+        // dentro das prateleiras com rolagem horizontal e o pôster "dá zoom" e pisca no hover.
+        style={{ rotateX: rx, rotateY: ry, transformPerspective: 800 }}
+        className="relative rounded-2xl transition-[scale,box-shadow] duration-300 group-hover:scale-[1.04] group-hover:shadow-[0_18px_50px_rgb(0_0_0/0.6)] group-focus-visible:ring-2 group-focus-visible:ring-accent group-active:scale-[0.97]"
       >
-        <Cover item={item} size={size} eager={eager} morph={morph} rounded="rounded-2xl" />
+        {/* Recorte por clip-path: com a inclinação, o Firefox deixa o overflow-hidden "vazar" nos cantos arredondados.
+            Dentro da peça inclinada nada de backdrop-filter nem mix-blend: no Firefox isso faz piscar. */}
+        <div className="relative overflow-hidden rounded-2xl [clip-path:inset(0_round_1rem)]">
+          <Cover item={item} size={size} eager={eager} morph={morph} rounded="rounded-2xl" />
 
-        {/* Reflexo que acompanha o mouse */}
-        <motion.div
-          className="pointer-events-none absolute inset-0 rounded-2xl opacity-0 mix-blend-overlay transition-opacity duration-300 group-hover:opacity-100"
-          style={{ background: glare }}
-        />
+          {/* Reflexo que acompanha o mouse */}
+          <motion.div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" style={{ background: glare }} />
 
-        {showBadge && (score || kindIcon) && (
-          <span className="glass absolute left-2 top-2 flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums">
-            {kindIcon && <KindIcon kind={item.kind} />}
-            {score && `★ ${score.value}`}
-          </span>
-        )}
-        {item.pinned && (
-          <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-danger/90">
-            <Heart size={12} className="fill-white text-white" />
-          </span>
-        )}
-        {access.tier === "mine" && <span className="absolute bottom-2 right-2 h-2.5 w-2.5 rounded-full bg-success ring-2 ring-black/50 group-hover:opacity-0" />}
+          {showBadge && (score || kindIcon) && (
+            <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-semibold tabular-nums ring-1 ring-white/10">
+              {kindIcon && <KindIcon kind={item.kind} />}
+              {score && `★ ${score.value}`}
+            </span>
+          )}
+          {item.pinned && (
+            <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-danger/90">
+              <Heart size={12} className="fill-white text-white" />
+            </span>
+          )}
+          {access.tier === "mine" && <span className="absolute bottom-2 right-2 h-2.5 w-2.5 rounded-full bg-success ring-2 ring-black/50 group-hover:opacity-0" />}
 
-        {/* Infos no hover (desktop) */}
-        {/* Infos no hover (desktop): degradê cobre o pôster inteiro; só o texto desliza */}
-        <div className="pointer-events-none absolute inset-0 hidden flex-col justify-end bg-[linear-gradient(to_top,rgb(0_0_0/0.96)_0%,rgb(0_0_0/0.82)_32%,rgb(0_0_0/0.35)_62%,transparent_85%)] p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100 [@media(hover:hover)]:flex">
-          <div className="translate-y-2 transition-transform duration-300 group-hover:translate-y-0">
-            <p className="text-[13px] font-semibold leading-tight line-clamp-2">{item.title}</p>
-            <p className="mt-1 text-[11px] text-white/65">{[item.year, length].filter(Boolean).join(" · ")}</p>
-            {item.kind !== "book" && access.tier !== "unknown" && (
-              <p className={`mt-0.5 truncate text-[11px] font-medium ${access.tier === "mine" ? "text-success" : "text-white/80"}`}>{access.label}</p>
-            )}
+          {/* Infos no hover (desktop): degradê cobre o pôster inteiro; só o texto desliza */}
+          <div className="pointer-events-none absolute inset-0 hidden flex-col justify-end bg-[linear-gradient(to_top,rgb(0_0_0/0.96)_0%,rgb(0_0_0/0.82)_32%,rgb(0_0_0/0.35)_62%,transparent_85%)] p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100 [@media(hover:hover)]:flex">
+            <div className="translate-y-2 transition-transform duration-300 group-hover:translate-y-0">
+              <p className="text-[13px] font-semibold leading-tight line-clamp-2">{item.title}</p>
+              <p className="mt-1 text-[11px] text-white/65">{[item.year, length].filter(Boolean).join(" · ")}</p>
+              {item.kind !== "book" && access.tier !== "unknown" && (
+                <p className={`mt-0.5 truncate text-[11px] font-medium ${access.tier === "mine" ? "text-success" : "text-white/80"}`}>{access.label}</p>
+              )}
+            </div>
           </div>
         </div>
       </motion.div>

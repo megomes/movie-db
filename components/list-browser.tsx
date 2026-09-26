@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element -- logos dos streamings (TMDB) */
 "use client";
 
 import Link from "next/link";
@@ -30,6 +31,9 @@ const TITLES: Record<Kind | "all", string> = { all: "Tudo", movie: "Filmes", ser
 type TagOption = { value: string; label: string; count: number };
 type TagGroup = { id: "tag" | "genre"; label: string; tags: TagOption[] };
 const genresOf = (i: LiteItem) => [...new Set(i.genres.map(ptGenre))];
+const streamsOn = (i: LiteItem) => (i.availability ? [...(i.availability.flatrate ?? []), ...(i.availability.free ?? []), ...(i.availability.ads ?? [])] : []);
+// "Amazon Prime Video" → "Prime Video", "Netflix Standard with Ads" → "Netflix"
+const shortName = (n: string) => n.replace(/^Amazon /, "").replace(/ (Standard|Basic) with Ads$/, "").replace(/ Amazon Channel$/, "");
 
 function countBy(items: LiteItem[], pick: (i: LiteItem) => string[], label: (v: string) => string, limit = 14): TagOption[] {
   const m = new Map<string, number>();
@@ -72,6 +76,7 @@ export function ListBrowser({
   const [filter, setFilter] = useState<{ tag: string | null; genre: string | null }>({ tag: null, genre: null });
   const [onlyPinned, setOnlyPinned] = useState(false);
   const [onlyMine, setOnlyMine] = useState(sp.get("f") === "mine");
+  const [provider, setProvider] = useState<number | null>(null);
   const [onlySale, setOnlySale] = useState(sp.get("f") === "sale");
   const [q, setQ] = useState("");
   const [seed, setSeed] = useState(1);
@@ -81,6 +86,7 @@ export function ListBrowser({
   if (lastKind !== kind) {
     setLastKind(kind);
     setFilter({ tag: null, genre: null });
+    setProvider(null);
   }
 
   const tagMeta = useMemo(() => new Map(tagList.map((t) => [t.id, t])), [tagList]);
@@ -106,6 +112,7 @@ export function ListBrowser({
       if (onlySale && !(i.steamPrice?.discountPercent ?? 0)) return false;
       if (filter.tag && !i.tagIds.includes(filter.tag)) return false;
       if (filter.genre && !genresOf(i).includes(filter.genre)) return false;
+      if (provider != null && !streamsOn(i).some((p) => p.id === provider)) return false;
       return true;
     });
     const len = (i: LiteItem) => (i.kind === "book" ? (i.pages ?? 9999) * 1.2 : (i.minutes ?? 99999));
@@ -120,11 +127,22 @@ export function ListBrowser({
     };
     list = [...list].sort(cmp[sort]);
     return list;
-  }, [ofKind, q, filter, onlyPinned, onlyMine, onlySale, sort, ctx.myProviders, seed, tagMeta]);
+  }, [ofKind, q, filter, onlyPinned, onlyMine, onlySale, provider, sort, ctx.myProviders, seed, tagMeta]);
+
+  // Seus streamings que têm algo nesta divisão (filtro com o logo)
+  const streamKinds = kind === "all" || kind === "movie" || kind === "series";
+  const providers = useMemo(() => {
+    if (readOnly || !streamKinds) return [];
+    const mine = new Set(ctx.myProviders);
+    const m = new Map<number, { id: number; name: string; logo: string | null; count: number }>();
+    for (const i of ofKind)
+      for (const p of streamsOn(i)) if (mine.has(p.id)) m.set(p.id, { ...p, count: (m.get(p.id)?.count ?? 0) + 1 });
+    return [...m.values()].sort((a, b) => b.count - a.count);
+  }, [ofKind, ctx.myProviders, readOnly, streamKinds]);
 
   // Agrupamento: Tudo → por divisão; divisão com tags → pela combinação de tags (sem repetir itens)
   const sections = useMemo(() => {
-    const filtering = !!q || !!filter.tag || !!filter.genre || onlyPinned || onlyMine || onlySale;
+    const filtering = !!q || !!filter.tag || !!filter.genre || onlyPinned || onlyMine || onlySale || provider != null;
     if (filtering) return [{ key: "all", title: "", href: undefined as string | undefined, items: visible }];
     if (kind === "all")
       return KINDS.map((k) => ({ key: k, title: KIND_META[k].plural, href: `${base}?k=${k}` as string | undefined, items: visible.filter((i) => i.kind === k) })).filter(
@@ -140,11 +158,12 @@ export function ListBrowser({
     return [...m.entries()]
       .sort((a, b) => (a[0] === "Sem tag" ? 1 : b[0] === "Sem tag" ? -1 : b[1].length - a[1].length))
       .map(([k, items]) => ({ key: k, title: k, href: undefined, items }));
-  }, [visible, kind, q, filter, onlyPinned, onlyMine, onlySale, tagList, tagMeta, base]);
+  }, [visible, kind, q, filter, onlyPinned, onlyMine, onlySale, provider, tagList, tagMeta, base]);
 
   const quick = [
     { on: onlyPinned, set: setOnlyPinned, label: "♥ Quero muito", show: true },
-    { on: onlyMine, set: setOnlyMine, label: "No meu streaming", show: !readOnly && (kind === "all" || kind === "movie" || kind === "series") },
+    // Com a linha de streamings, o "Todos os meus" fica lá
+    { on: onlyMine, set: setOnlyMine, label: "No meu streaming", show: !readOnly && streamKinds && !providers.length && ctx.myProviders.length > 0 },
     { on: onlySale, set: setOnlySale, label: "Em promoção", show: kind === "game" },
   ].filter((x) => x.show);
 
@@ -211,6 +230,46 @@ export function ListBrowser({
             ))}
           </div>
         </div>
+        {!readOnly && streamKinds && (providers.length > 0 || !ctx.myProviders.length) && (
+          <div className={`no-scrollbar flex items-center gap-2 overflow-x-auto ${GUTTER}`}>
+            <span className="shrink-0 pr-1 text-[11px] font-semibold uppercase tracking-wider text-white/40">Streaming</span>
+            {providers.length > 0 ? (
+              <>
+                <TagChip
+                  on={onlyMine && provider == null}
+                  onClick={() => {
+                    setProvider(null);
+                    setOnlyMine(!(onlyMine && provider == null));
+                  }}
+                >
+                  Todos os meus
+                </TagChip>
+                {providers.map((p) => {
+                  const on = provider === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        setOnlyMine(false);
+                        setProvider(on ? null : p.id);
+                      }}
+                      aria-pressed={on}
+                      title={p.name}
+                      className={`tap flex h-9 shrink-0 items-center gap-2 rounded-full pl-1 pr-3.5 text-[13px] font-medium transition-colors ${on ? "btn-accent" : "glass text-white/75 hover:text-white"}`}
+                    >
+                      <span className="h-7 w-7 overflow-hidden rounded-full bg-white/10">{p.logo && <img src={p.logo} alt="" className="h-full w-full object-cover" loading="lazy" />}</span>
+                      {shortName(p.name)} <span className="opacity-55">{p.count}</span>
+                    </button>
+                  );
+                })}
+              </>
+            ) : (
+              <Link href="/ajustes" className="glass tap flex h-9 shrink-0 items-center rounded-full px-3.5 text-[13px] font-medium text-white/75 hover:text-white">
+                + Marcar meus streamings
+              </Link>
+            )}
+          </div>
+        )}
         {groups.map((g) => (
           <div key={g.id} className={`no-scrollbar flex items-center gap-2 overflow-x-auto ${GUTTER}`}>
             <span className="shrink-0 pr-1 text-[11px] font-semibold uppercase tracking-wider text-white/40">{g.label}</span>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, ChevronRight as Arrow } from "lucide-react";
 import type { LiteItem } from "@/lib/queries";
 import { Cover } from "./cover";
@@ -11,9 +11,28 @@ import { Poster } from "./poster";
 export const GUTTER = "px-4 sm:px-6 lg:px-10";
 
 export function useRailScroll() {
-  const ref = useRef<HTMLDivElement>(null);
-  const by = (dir: 1 | -1) => ref.current?.scrollBy({ left: dir * ref.current.clientWidth * 0.85, behavior: "smooth" });
-  return { ref, by };
+  const el = useRef<HTMLDivElement | null>(null);
+  // Onde a rolagem está: as setas só aparecem quando há pra onde ir
+  const [edges, setEdges] = useState({ start: true, end: false });
+  const ref = useCallback((node: HTMLDivElement | null) => {
+    el.current = node;
+    if (!node) return;
+    const update = () => {
+      const start = node.scrollLeft < 8;
+      const end = node.scrollLeft + node.clientWidth >= node.scrollWidth - 8;
+      setEdges((e) => (e.start === start && e.end === end ? e : { start, end }));
+    };
+    update();
+    node.addEventListener("scroll", update, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(node);
+    return () => {
+      node.removeEventListener("scroll", update);
+      ro.disconnect();
+    };
+  }, []);
+  const by = (dir: 1 | -1) => el.current?.scrollBy({ left: dir * el.current.clientWidth * 0.85, behavior: "smooth" });
+  return { ref, by, edges };
 }
 
 function RailHeader({ title, subtitle, href }: { title: string; subtitle?: string; href?: string }) {
@@ -32,17 +51,23 @@ function RailHeader({ title, subtitle, href }: { title: string; subtitle?: strin
   );
 }
 
-export function Arrows({ by }: { by: (d: 1 | -1) => void }) {
+// Sem vidro (backdrop-filter pisca no Firefox sobre os pôsteres animados) e só quando dá pra rolar:
+// uma seta invisível por cima do primeiro pôster roubava o hover e fazia ele piscar
+export function Arrows({ by, edges }: { by: (d: 1 | -1) => void; edges: { start: boolean; end: boolean } }) {
   const cls =
-    "glass absolute top-1/2 z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full opacity-0 transition-opacity duration-200 group-hover/rail:opacity-100 lg:flex";
+    "absolute top-1/2 z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-[#0b0f17]/90 shadow-[0_8px_24px_rgb(0_0_0/0.5)] ring-1 ring-white/15 opacity-0 transition-opacity duration-200 hover:bg-[#161c28] group-hover/rail:opacity-100 lg:flex";
   return (
     <>
-      <button onClick={() => by(-1)} className={`${cls} left-3`} aria-label="Anterior">
-        <ChevronLeft size={22} />
-      </button>
-      <button onClick={() => by(1)} className={`${cls} right-3`} aria-label="Próximo">
-        <ChevronRight size={22} />
-      </button>
+      {!edges.start && (
+        <button onClick={() => by(-1)} className={`${cls} left-3`} aria-label="Anterior">
+          <ChevronLeft size={22} />
+        </button>
+      )}
+      {!edges.end && (
+        <button onClick={() => by(1)} className={`${cls} right-3`} aria-label="Próximo">
+          <ChevronRight size={22} />
+        </button>
+      )}
     </>
   );
 }
@@ -63,7 +88,7 @@ export function Rail({
   morphIds?: Set<string>;
   empty?: React.ReactNode;
 }) {
-  const { ref, by } = useRailScroll();
+  const { ref, by, edges } = useRailScroll();
   if (!items.length && !empty) return null;
   const mixed = isMixed(items);
   return (
@@ -78,7 +103,7 @@ export function Rail({
               </div>
             ))}
           </div>
-          <Arrows by={by} />
+          <Arrows by={by} edges={edges} />
         </div>
       ) : (
         <div className={GUTTER}>{empty}</div>
@@ -89,7 +114,7 @@ export function Rail({
 
 // Top 10 com números gigantes vazados atrás dos pôsteres
 export function TopTen({ items, morphIds }: { items: LiteItem[]; morphIds?: Set<string> }) {
-  const { ref, by } = useRailScroll();
+  const { ref, by, edges } = useRailScroll();
   if (items.length < 3) return null;
   const mixed = isMixed(items);
   return (
@@ -112,7 +137,7 @@ export function TopTen({ items, morphIds }: { items: LiteItem[]; morphIds?: Set<
             </Link>
           ))}
         </div>
-        <Arrows by={by} />
+        <Arrows by={by} edges={edges} />
       </div>
     </section>
   );
