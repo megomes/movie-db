@@ -2,6 +2,7 @@ import "server-only";
 import { and, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { asc } from "drizzle-orm";
 import { db, items, profiles, tags, type Item } from "@/lib/db";
+import { hoursOf } from "@/lib/kinds";
 
 export type Person = { userId: string; name: string | null; image: string | null; email: string };
 
@@ -16,6 +17,15 @@ export async function listItems(ownerId: string) {
 export async function countDone(ownerId: string) {
   const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(items).where(and(eq(items.ownerId, ownerId), isNotNull(items.doneAt)));
   return row?.n ?? 0;
+}
+
+// Horas somadas de tudo que já foi visto (rodapé)
+export async function doneHours(ownerId: string) {
+  const rows = await db
+    .select({ kind: items.kind, minutes: items.minutes, seasons: items.seasons, pages: items.pages })
+    .from(items)
+    .where(and(eq(items.ownerId, ownerId), isNotNull(items.doneAt)));
+  return rows.reduce((s, i) => s + hoursOf(i), 0);
 }
 
 // Histórico: o que a pessoa já viu/jogou/leu, mais recente primeiro

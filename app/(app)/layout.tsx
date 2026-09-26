@@ -1,8 +1,7 @@
 import { AppShell } from "@/components/app-shell";
 import { BacklogProvider } from "@/components/backlog-context";
 import { SiteFooter } from "@/components/site-footer";
-import { visitSeed } from "@/lib/kinds";
-import { countDone, listItems, listPeople, listShared, listTags, toLite } from "@/lib/queries";
+import { countDone, doneHours, listItems, listPeople, listShared, listTags, toLite } from "@/lib/queries";
 import { getProfile, requireUser } from "@/lib/session";
 
 // Tudo aqui depende da sessão do usuário
@@ -10,13 +9,14 @@ export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const user = await requireUser();
-  const [rows, profile, people, tags, shared, doneCount] = await Promise.all([
+  const [rows, profile, people, tags, shared, doneCount, watchedHours] = await Promise.all([
     listItems(user.id),
     getProfile(user.id),
     listPeople(),
     listTags(user.id),
     listShared(user.id),
     countDone(user.id),
+    doneHours(user.id),
   ]);
   const items = rows.map(toLite);
   const reviewCount = rows.filter((r) => r.matchStatus !== "matched").length;
@@ -32,7 +32,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       shared={shared}
       doneCount={doneCount}
     >
-      <AppShell footer={<SiteFooter seed={visitSeed()} />}>{children}</AppShell>
+      <AppShell footer={<SiteFooter doneHours={watchedHours} />}>{children}</AppShell>
     </BacklogProvider>
   );
 }

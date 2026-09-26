@@ -3,34 +3,25 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { CircleCheckBig, Dices, HeartHandshake, Hourglass } from "lucide-react";
-import type { LiteItem } from "@/lib/queries";
+import { CircleCheckBig, HeartHandshake, Hourglass } from "lucide-react";
+import { hoursOf } from "@/lib/kinds";
 import { useBacklog } from "./backlog-context";
-
-// Quanto tempo leva pra consumir um item (estimativa grosseira, é só pra graça)
-function hoursOf(i: LiteItem) {
-  if (i.kind === "movie") return (i.minutes ?? 110) / 60;
-  if (i.kind === "series") return (i.seasons ?? 1) * 8;
-  if (i.kind === "game") return (i.minutes ?? 900) / 60;
-  return ((i.pages ?? 300) * 1.3) / 60; // ~1,3 min por página
-}
 
 const Sep = () => <span className="text-white/20">·</span>;
 const B = ({ children }: { children: React.ReactNode }) => <b className="font-semibold text-white/75">{children}</b>;
 
 const fmt = (n: number) => Math.round(n).toLocaleString("pt-BR");
 
-// Rodapé pessoal: números vivos do backlog e o "dado" desta visita
-export function SiteFooter({ seed }: { seed: number }) {
+// Rodapé pessoal: números vivos do backlog (quanto falta e quanto já foi)
+export function SiteFooter({ doneHours }: { doneHours: number }) {
   const { items, doneCount, shared } = useBacklog();
 
   const facts = useMemo(() => {
     const hours = items.reduce((s, i) => s + hoursOf(i), 0);
-    const pick = items.length ? items[seed % items.length] : null;
     const common = shared.reduce((s, p) => s + p.count, 0);
     const partner = shared.find((p) => p.count)?.name?.split(" ")[0];
-    return { hours, pick, common, partner };
-  }, [items, shared, seed]);
+    return { hours, common, partner };
+  }, [items, shared]);
 
   return (
     // Faixa de ponta a ponta, mais escura, com o conteúdo na coluna central
@@ -48,22 +39,15 @@ export function SiteFooter({ seed }: { seed: number }) {
               <Hourglass size={12} className="text-white/35" />
               zerar tudo: <B>{fmt(facts.hours / 24)} dias</B> sem dormir, ou <B>{(facts.hours / 2 / 365).toFixed(1).replace(".", ",")} anos</B> a 2h/dia
             </span>
-            {facts.pick && (
-              <>
-                <Sep />
-                <span className="inline-flex items-center gap-1.5">
-                  <Dices size={12} className="text-white/35" />
-                  o dado diz{" "}
-                  <Link href={`/item/${facts.pick.id}`} className="font-semibold text-accent-2 hover:underline">
-                    {facts.pick.title}
-                  </Link>
-                </span>
-              </>
-            )}
             <Sep />
             <Link href="/vistos" className="inline-flex items-center gap-1.5 hover:text-white">
               <CircleCheckBig size={12} className="text-white/35" />
               <B>{fmt(doneCount)}</B> {doneCount === 1 ? "visto" : "vistos"}
+              {doneHours > 0 && (
+                <>
+                  : <B>{doneHours >= 48 ? `${fmt(doneHours / 24)} dias` : `${fmt(doneHours)}h`}</B> sem dormir
+                </>
+              )}
             </Link>
             {facts.common > 0 && (
               <>

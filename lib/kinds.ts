@@ -84,6 +84,14 @@ export function scoreLabel(item: Pick<Item, "kind" | "ratings" | "score">) {
 
 // Semente que muda uma vez por dia (destaques da home)
 export const daySeed = () => Math.floor(Date.now() / 86_400_000) % 997;
+// Horas pra consumir um item (estimativa grosseira: série ~8h/temporada, livro ~1,3 min/página)
+export function hoursOf(i: { kind: string; minutes: number | null; seasons: number | null; pages: number | null }) {
+  if (i.kind === "movie") return (i.minutes ?? 110) / 60;
+  if (i.kind === "series") return (i.seasons ?? 1) * 8;
+  if (i.kind === "game") return (i.minutes ?? 900) / 60;
+  return ((i.pages ?? 300) * 1.3) / 60;
+}
+
 // Quantos "vistos" liberam as estatísticas
 export const STATS_MIN = 5;
 
