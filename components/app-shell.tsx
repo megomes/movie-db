@@ -59,7 +59,7 @@ function TopBar() {
   return (
     <header className="fixed inset-x-0 top-0 z-40 hidden px-6 pt-4 lg:block">
       <div
-        className={`glass-nav mx-auto flex h-14 max-w-[1400px] items-center justify-between gap-6 rounded-full px-3 transition-shadow duration-500 ${scrolled ? "shadow-2xl" : ""}`}
+        className={`glass-nav mx-auto flex h-14 max-w-[1520px] items-center justify-between gap-6 rounded-full px-3 transition-shadow duration-500 ${scrolled ? "shadow-2xl" : ""}`}
       >
         <Link href="/" className="flex items-center gap-2.5 pl-1">
           <img src="/icons/icon-192.png" alt="" className="h-9 w-9 rounded-[10px]" />

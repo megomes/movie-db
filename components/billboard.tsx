@@ -66,16 +66,18 @@ export function Billboard({ featured }: { featured: LiteItem[] }) {
         <div className="fade-left absolute inset-0" />
         <div className="fade-bottom absolute inset-0" />
 
-        <div className={`absolute inset-x-0 bottom-[14%] ${GUTTER}`}>
-          <AnimatePresence mode="wait">
-            <motion.div key={item.id} initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }} className="max-w-2xl">
-              <Meta item={item} big />
-            </motion.div>
-          </AnimatePresence>
-          <Actions key={item.id} item={item} onDraw={() => setDrawOpen(true)} />
+        {/* Conteúdo na mesma coluna central do resto da home (a arte continua de ponta a ponta) */}
+        <div className="absolute inset-x-0 bottom-[14%]">
+          <div className={`relative mx-auto max-w-[1600px] ${GUTTER}`}>
+            <AnimatePresence mode="wait">
+              <motion.div key={item.id} initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }} className="max-w-2xl">
+                <Meta item={item} big />
+              </motion.div>
+            </AnimatePresence>
+            <Actions key={item.id} item={item} onDraw={() => setDrawOpen(true)} />
+            <Progress featured={featured} index={index} paused={paused || !onScreen} onPick={setIndex} className="absolute bottom-4 right-4 sm:right-6 lg:right-10" />
+          </div>
         </div>
-
-        <Progress featured={featured} index={index} paused={paused || !onScreen} onPick={setIndex} className="absolute bottom-[14%] right-10" />
       </div>
 
       {/* Celular: card de arte arrastável */}
@@ -161,14 +163,17 @@ function Art({ item }: { item: LiteItem }) {
   return (
     <div className="relative h-full w-full" style={{ backgroundColor: item.coverColor ?? "#101522" }}>
       {item.coverUrl && <img src={coverSrc(item.coverUrl, "sm")!} alt="" className="absolute inset-0 h-full w-full scale-125 object-cover opacity-50 blur-3xl saturate-150" />}
-      <motion.div
-        initial={{ opacity: 0, y: 30, rotate: 4 }}
-        animate={{ opacity: 1, y: 0, rotate: -3 }}
-        transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
-        className="absolute right-[12%] top-1/2 w-[min(22vw,340px)] -translate-y-1/2 shadow-[0_40px_90px_rgb(0_0_0/0.7)]"
-      >
-        <Cover item={item} size="lg" rounded="rounded-2xl" eager />
-      </motion.div>
+      {/* Capa dentro da coluna central, pra não grudar na borda em telas largas */}
+      <div className="absolute inset-y-0 left-1/2 w-full max-w-[1600px] -translate-x-1/2">
+        <motion.div
+          initial={{ opacity: 0, y: 30, rotate: 4 }}
+          animate={{ opacity: 1, y: 0, rotate: -3 }}
+          transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+          className="absolute right-[10%] top-1/2 w-[min(22vw,340px)] -translate-y-1/2 shadow-[0_40px_90px_rgb(0_0_0/0.7)]"
+        >
+          <Cover item={item} size="lg" rounded="rounded-2xl" eager />
+        </motion.div>
+      </div>
     </div>
   );
 }
