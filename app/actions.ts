@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
-import { db, interests, items, profiles, pushSubscriptions, type Kind } from "@/lib/db";
+import { db, items, profiles, pushSubscriptions, type Kind } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { enrich, searchCandidates } from "@/lib/enrich";
 import { findByImdbId, searchTmdbMulti } from "@/lib/sources/tmdb";
@@ -18,36 +18,42 @@ function refresh(id?: string) {
   if (id) revalidatePath(`/item/${id}`);
 }
 
-export async function toggleInterest(itemId: string) {
+// Só o dono mexe no próprio backlog
+async function own(itemId: string) {
   const user = await requireUser();
-  const where = and(eq(interests.itemId, itemId), eq(interests.userId, user.id));
-  const existing = await db.select().from(interests).where(where);
-  if (existing.length) await db.delete(interests).where(where);
-  else await db.insert(interests).values({ itemId, userId: user.id });
+  const [row] = await db.select().from(items).where(and(eq(items.id, itemId), eq(items.ownerId, user.id)));
+  if (!row) throw new Error("Item não encontrado no seu backlog");
+  return { user, item: row };
+}
+
+export async function togglePin(itemId: string) {
+  const { item } = await own(itemId);
+  await db.update(items).set({ pinned: !item.pinned }).where(eq(items.id, itemId));
   refresh(itemId);
+  return !item.pinned;
 }
 
 // "Visto" = some da lista. Guarda done_at por 1 dia para permitir desfazer; o cron apaga depois.
 export async function markDone(itemId: string) {
-  await requireUser();
+  await own(itemId);
   await db.update(items).set({ doneAt: new Date() }).where(eq(items.id, itemId));
   refresh(itemId);
 }
 
 export async function undoDone(itemId: string) {
-  await requireUser();
+  await own(itemId);
   await db.update(items).set({ doneAt: null }).where(eq(items.id, itemId));
   refresh(itemId);
 }
 
 export async function deleteItem(itemId: string) {
-  await requireUser();
+  await own(itemId);
   await db.delete(items).where(eq(items.id, itemId));
   refresh();
 }
 
 export async function updateNotes(itemId: string, notes: string) {
-  await requireUser();
+  await own(itemId);
   await db.update(items).set({ notes: notes.trim() || null }).where(eq(items.id, itemId));
   refresh(itemId);
 }
@@ -57,16 +63,12 @@ export async function searchAction(kind: string, query: string) {
   const q = query.trim();
   if (!q) return [];
   if (kind === "any") {
-    const [av, games, books] = await Promise.allSettled([
-      searchTmdbMulti(q),
-      searchCandidates("game", q),
-      searchCandidates("book", q),
-    ]);
+    const [av, games, books] = await Promise.allSettled([searchTmdbMulti(q), searchCandidates("game", q), searchCandidates("book", q)]);
     const ok = <T,>(r: PromiseSettledResult<T[]>) => (r.status === "fulfilled" ? r.value : []);
     return [
-      ...ok(av).map((c) => ({ ...c })),
-      ...ok(games).slice(0, 5).map((c) => ({ ...c, kind: "game" as const })),
-      ...ok(books).slice(0, 5).map((c) => ({ ...c, kind: "book" as const })),
+      ...ok(av),
+      ...ok(games).slice(0, 6).map((c) => ({ ...c, kind: "game" as const })),
+      ...ok(books).slice(0, 6).map((c) => ({ ...c, kind: "book" as const })),
     ].map(({ externalId, title, year, cover, subtitle, kind }) => ({ externalId, title, year, cover, subtitle, kind }));
   }
   const k = assertKind(kind);
@@ -80,9 +82,8 @@ export async function addItem(kind: string, externalId: string, myPlatforms: str
   const data = await enrich(k, externalId);
   const [row] = await db
     .insert(items)
-    .values({ title: "", ...data, kind: k, myPlatforms, addedBy: user.id, source: "manual", matchStatus: "matched" })
+    .values({ title: "", ...data, kind: k, myPlatforms, ownerId: user.id, source: "manual", matchStatus: "matched" })
     .returning({ id: items.id });
-  await db.insert(interests).values({ itemId: row.id, userId: user.id }).onConflictDoNothing();
   refresh();
   return row.id;
 }
@@ -94,46 +95,53 @@ export async function addFromImdb(imdbId: string) {
   return addItem(found.kind, String(found.id));
 }
 
+// Traz um item do backlog de outra pessoa para o seu (copia os dados, sem notas)
+export async function copyToMine(itemId: string) {
+  const user = await requireUser();
+  const [src] = await db.select().from(items).where(eq(items.id, itemId));
+  if (!src) throw new Error("Item não encontrado");
+  const { id: _id, notes: _n, ownerId: _o, pinned: _p, createdAt: _c, doneAt: _d, source: _s, sourcePath: _sp, ...rest } = src;
+  void [_id, _n, _o, _p, _c, _d, _s, _sp];
+  const [row] = await db
+    .insert(items)
+    .values({ ...rest, ownerId: user.id, source: "copy" })
+    .returning({ id: items.id });
+  refresh();
+  return row.id;
+}
+
 // Troca a correspondência de um item (tela Revisar ou detalhe), mantendo notas/prioridade/plataformas
 export async function rematch(itemId: string, kind: string, externalId: string) {
-  await requireUser();
+  const { item: current } = await own(itemId);
   const k = assertKind(kind);
-  const [current] = await db.select().from(items).where(eq(items.id, itemId));
-  if (!current) throw new Error("Item não encontrado");
   const data = await enrich(k, externalId, { author: current.creators[0] });
   await db
     .update(items)
-    .set({
-      ...data,
-      kind: k,
-      creators: data.creators?.length ? data.creators : current.creators,
-      matchStatus: "matched",
-      candidates: [],
-    })
+    .set({ ...data, kind: k, creators: data.creators?.length ? data.creators : current.creators, matchStatus: "matched", candidates: [] })
     .where(eq(items.id, itemId));
   refresh(itemId);
 }
 
 export async function confirmMatch(itemId: string) {
-  await requireUser();
+  await own(itemId);
   await db.update(items).set({ matchStatus: "matched", candidates: [] }).where(eq(items.id, itemId));
   refresh(itemId);
 }
 
 export async function reenrich(itemId: string) {
-  await requireUser();
-  const [current] = await db.select().from(items).where(eq(items.id, itemId));
-  if (!current) return;
-  const ext =
-    current.kind === "game" ? current.igdbId : current.kind === "book" ? current.googleBooksId : current.tmdbId;
+  const { item: current } = await own(itemId);
+  const ext = current.kind === "game" ? current.igdbId : current.kind === "book" ? current.googleBooksId : current.tmdbId;
   if (!ext) return;
   const data = await enrich(current.kind, String(ext), { author: current.creators[0] });
-  await db.update(items).set({ ...data, creators: data.creators?.length ? data.creators : current.creators }).where(eq(items.id, itemId));
+  await db
+    .update(items)
+    .set({ ...data, creators: data.creators?.length ? data.creators : current.creators })
+    .where(eq(items.id, itemId));
   refresh(itemId);
 }
 
 export async function setMyPlatforms(itemId: string, platforms: string[]) {
-  await requireUser();
+  await own(itemId);
   await db.update(items).set({ myPlatforms: platforms }).where(eq(items.id, itemId));
   refresh(itemId);
 }
@@ -157,9 +165,7 @@ export async function savePushSubscription(sub: { endpoint: string; keys: { p256
 
 export async function removePushSubscription(endpoint: string) {
   const user = await requireUser();
-  await db
-    .delete(pushSubscriptions)
-    .where(and(eq(pushSubscriptions.endpoint, endpoint), eq(pushSubscriptions.userId, user.id)));
+  await db.delete(pushSubscriptions).where(and(eq(pushSubscriptions.endpoint, endpoint), eq(pushSubscriptions.userId, user.id)));
 }
 
 export async function sendTestPush() {

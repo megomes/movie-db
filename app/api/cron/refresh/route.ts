@@ -35,7 +35,8 @@ export async function GET(req: Request) {
       const availability = await getTmdbProviders(it.kind as "movie" | "series", it.tmdbId!);
       const before = streamIds(it.availability);
       const after = streamIds(availability);
-      for (const p of people) {
+      // Só avisa o dono do item, e só sobre serviços que ele assina
+      for (const p of people.filter((x) => x.userId === it.ownerId)) {
         const arrived = [...after].find((id) => !before.has(id) && p.providerIds.includes(id));
         if (arrived) {
           const name = [...(availability.flatrate ?? []), ...(availability.free ?? []), ...(availability.ads ?? [])].find((x) => x.id === arrived)?.name;
@@ -65,7 +66,7 @@ export async function GET(req: Request) {
       const price = await getSteamPrice(it.steamAppId!);
       const was = it.steamPrice?.discountPercent ?? 0;
       if (price && price.discountPercent >= 50 && was < 50) {
-        for (const p of people) push(p.userId, it, `${it.title} está -${price.discountPercent}% na Steam (${price.formatted})`);
+        push(it.ownerId, it, `${it.title} está -${price.discountPercent}% na Steam (${price.formatted})`);
       }
       await db.update(items).set({ steamPrice: price }).where(eq(items.id, it.id));
       gamesUpdated++;

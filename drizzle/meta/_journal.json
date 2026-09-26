@@ -15,6 +15,27 @@
       "when": 1790383263050,
       "tag": "0001_cast",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790384296309,
+      "tag": "0002_cover_palette",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790384402576,
+      "tag": "0003_owner",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790384416997,
+      "tag": "0004_owner_required",
+      "breakpoints": true
     }
   ]
 }

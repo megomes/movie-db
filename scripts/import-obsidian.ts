@@ -1,6 +1,6 @@
 /**
  * Importa o backlog do Obsidian uma única vez.
- *   npm run import:obsidian            -> importa tudo
+ *   npm run import:obsidian -- --owner=email@x.com   -> importa tudo para o backlog dessa pessoa
  *   npm run import:obsidian -- --dry   -> só mostra o que faria
  * É idempotente: pula notas cujo source_path já está no banco.
  */
@@ -8,7 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
 import { and, eq, inArray } from "drizzle-orm";
-import { db, items, type Kind, type NewItem } from "../lib/db";
+import { db, items, profiles, type Kind, type NewItem } from "../lib/db";
 import { enrich, pickMatch, searchCandidates } from "../lib/enrich";
 import { findByImdbId } from "../lib/sources/tmdb";
 import { normalize } from "../lib/sources/http";
@@ -17,6 +17,8 @@ const ROOT = "C:/Users/mathe/Documents/Obsidian Notes/Personal Notes/Backlog";
 const MEDIA_DIR = path.join(ROOT, "Media/Itens");
 const BOOKS_DIR = path.join(ROOT, "Biblioteca/Livros");
 const DRY = process.argv.includes("--dry");
+const OWNER_EMAIL = process.argv.find((a) => a.startsWith("--owner="))?.slice(8) ?? "matheuservilha@gmail.com";
+let OWNER_ID = "";
 
 type Entry = {
   kind: Kind;
@@ -128,6 +130,7 @@ function readBooks(): Entry[] {
 
 async function importEntry(e: Entry): Promise<{ status: string; row: NewItem }> {
   const base: NewItem = {
+    ownerId: OWNER_ID,
     kind: e.kind,
     title: e.title,
     notes: e.notes,
@@ -187,7 +190,7 @@ async function recheck(entries: Entry[]) {
   const rows = await db
     .select({ id: items.id, sourcePath: items.sourcePath, title: items.title })
     .from(items)
-    .where(and(eq(items.source, "obsidian"), inArray(items.matchStatus, ["needs_review", "unmatched"])));
+    .where(and(eq(items.ownerId, OWNER_ID), eq(items.source, "obsidian"), inArray(items.matchStatus, ["needs_review", "unmatched"])));
   const bySource = new Map(entries.map((e) => [e.sourcePath, e]));
   const summary: Record<string, number> = {};
   await pool(rows, 3, async (r, idx) => {
@@ -209,10 +212,13 @@ async function recheck(entries: Entry[]) {
 }
 
 async function main() {
+  const [owner] = await db.select().from(profiles).where(eq(profiles.email, OWNER_EMAIL));
+  if (!owner) throw new Error(`${OWNER_EMAIL} ainda não entrou no app (sem perfil)`);
+  OWNER_ID = owner.userId;
   const entries = [...readMedia(), ...readBooks()];
   if (process.argv.includes("--recheck")) return recheck(entries);
   const existing = new Set(
-    (await db.select({ p: items.sourcePath }).from(items)).map((r) => r.p).filter(Boolean) as string[],
+    (await db.select({ p: items.sourcePath }).from(items).where(eq(items.ownerId, OWNER_ID))).map((r) => r.p).filter(Boolean) as string[],
   );
   const todo = entries.filter((e) => !existing.has(e.sourcePath));
   const byKind = todo.reduce<Record<string, number>>((a, e) => ((a[e.kind] = (a[e.kind] ?? 0) + 1), a), {});

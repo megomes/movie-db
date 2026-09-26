@@ -81,3 +81,6 @@ export function scoreLabel(item: Pick<Item, "kind" | "ratings" | "score">) {
       return null;
   }
 }
+
+// Semente que muda uma vez por dia (destaques da home)
+export const daySeed = () => Math.floor(Date.now() / 86_400_000) % 997;

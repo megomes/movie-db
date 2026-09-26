@@ -8,7 +8,6 @@ import {
   real,
   jsonb,
   timestamp,
-  primaryKey,
   index,
 } from "drizzle-orm/pg-core";
 
@@ -71,6 +70,9 @@ export const items = pgTable(
     year: integer("year"),
     coverUrl: text("cover_url"),
     backdropUrl: text("backdrop_url"),
+    // Cor dominante da capa (#rrggbb) e miniatura borrada (data URL) para placeholder instantâneo
+    coverColor: text("cover_color"),
+    coverBlur: text("cover_blur"),
     overview: text("overview"),
     genres: text("genres").array().notNull().default([]),
     creators: text("creators").array().notNull().default([]),
@@ -109,6 +111,8 @@ export const items = pgTable(
     summary: text("summary"),
     notes: text("notes"),
     priority: integer("priority"),
+    // "Quero muito": sobe na lista e pesa mais no sorteio
+    pinned: boolean("pinned").notNull().default(false),
 
     matchStatus: matchStatusEnum("match_status").notNull().default("matched"),
     candidates: jsonb("candidates").$type<Candidate[]>().notNull().default([]),
@@ -116,28 +120,18 @@ export const items = pgTable(
 
     source: text("source").notNull().default("manual"),
     sourcePath: text("source_path"),
-    addedBy: text("added_by"),
+    // Dono do backlog (cada pessoa tem o seu)
+    ownerId: text("owner_id").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     enrichedAt: timestamp("enriched_at", { withTimezone: true }),
     doneAt: timestamp("done_at", { withTimezone: true }),
   },
   (t) => [
+    index("items_owner_idx").on(t.ownerId),
     index("items_kind_idx").on(t.kind),
     index("items_match_idx").on(t.matchStatus),
     index("items_done_idx").on(t.doneAt),
   ],
-);
-
-export const interests = pgTable(
-  "interests",
-  {
-    itemId: uuid("item_id")
-      .notNull()
-      .references(() => items.id, { onDelete: "cascade" }),
-    userId: text("user_id").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (t) => [primaryKey({ columns: [t.itemId, t.userId] })],
 );
 
 export const profiles = pgTable("profiles", {

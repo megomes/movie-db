@@ -1,13 +1,15 @@
 /* eslint-disable @next/next/no-img-element -- capas externas */
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
-import { Loader2, Plus, Search } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { Check, Loader2, Plus, Search, X } from "lucide-react";
 import { addFromImdb, addItem, searchAction } from "@/app/actions";
 import type { Kind } from "@/lib/db/schema";
 import { KIND_META, KINDS } from "@/lib/kinds";
-import { Chip } from "./chip";
+import { normalize } from "@/lib/sources/http";
+import { useBacklog } from "./backlog-context";
 
 type Result = Awaited<ReturnType<typeof searchAction>>[number];
 
@@ -16,7 +18,6 @@ export function useSearch(kind: Kind | "any", query: string) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const seq = useRef(0);
-
   const active = query.trim().length >= 2;
 
   useEffect(() => {
@@ -34,7 +35,7 @@ export function useSearch(kind: Kind | "any", query: string) {
       } finally {
         if (id === seq.current) setLoading(false);
       }
-    }, 400);
+    }, 380);
     return () => clearTimeout(t);
   }, [kind, query]);
 
@@ -42,93 +43,129 @@ export function useSearch(kind: Kind | "any", query: string) {
 }
 
 export function AddSearch({ initialQuery, initialKind, imdbId }: { initialQuery: string; initialKind: Kind | "any"; imdbId: string | null }) {
-  const router = useRouter();
+  const { items } = useBacklog();
   const [kind, setKind] = useState<Kind | "any">(initialKind);
   const [query, setQuery] = useState(initialQuery);
-  const [adding, setAdding] = useState<string | null>(null);
-  const [, start] = useTransition();
+  const [status, setStatus] = useState<Record<string, "adding" | string>>({});
   const { results, loading, error } = useSearch(kind, query);
 
-  function add(r: Result) {
+  // Marca o que já está no backlog (pelo título + ano)
+  const owned = new Set(items.map((i) => `${normalize(i.title)}|${i.year ?? ""}`));
+
+  async function add(r: Result) {
     const key = `${r.kind}:${r.externalId}`;
-    setAdding(key);
-    start(async () => {
-      try {
-        const id = await addItem(r.kind, r.externalId);
-        router.push(`/item/${id}`);
-      } catch {
-        setAdding(null);
-        alert("Não consegui adicionar. Tenta de novo.");
-      }
-    });
+    setStatus((s) => ({ ...s, [key]: "adding" }));
+    try {
+      const id = await addItem(r.kind, r.externalId);
+      setStatus((s) => ({ ...s, [key]: id }));
+      navigator.vibrate?.(12);
+    } catch {
+      setStatus((s) => {
+        const next = { ...s };
+        delete next[key];
+        return next;
+      });
+    }
   }
 
   return (
     <div>
       {imdbId && (
         <button
-          onClick={() => {
-            setAdding("imdb");
-            start(async () => {
-              const id = await addFromImdb(imdbId);
-              if (id) router.push(`/item/${id}`);
-              else setAdding(null);
-            });
+          onClick={async () => {
+            setStatus((s) => ({ ...s, imdb: "adding" }));
+            const id = await addFromImdb(imdbId);
+            if (id) setStatus((s) => ({ ...s, imdb: id }));
           }}
-          className="tap mb-4 flex h-10 w-full items-center justify-center gap-2 rounded-full bg-pill text-[15px] font-medium text-white"
+          className="btn-accent mb-5 flex h-12 w-full items-center justify-center gap-2 rounded-full font-semibold"
         >
-          {adding === "imdb" ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
-          Adicionar o link do IMDb compartilhado
+          {status.imdb === "adding" ? <Loader2 size={18} className="animate-spin" /> : status.imdb ? <Check size={18} /> : <Plus size={18} />}
+          {status.imdb && status.imdb !== "adding" ? "Adicionado do IMDb" : "Adicionar o link do IMDb compartilhado"}
         </button>
       )}
 
-      <div className="relative">
-        <Search size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-text-3" />
+      <div className="glass flex h-14 items-center rounded-full px-5 focus-within:border-accent/60">
+        <Search size={20} className="text-text-2" />
         <input
           autoFocus={!imdbId}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Nome do filme, série, jogo ou livro"
-          className="h-11 w-full rounded-full bg-bg-3 pl-11 pr-10 text-base outline-none placeholder:text-text-3"
+          placeholder="Filme, série, jogo ou livro…"
+          className="h-full flex-1 bg-transparent pl-3 text-[17px] outline-none placeholder:text-text-3"
         />
-        {loading && <Loader2 size={18} className="absolute right-3.5 top-1/2 -translate-y-1/2 animate-spin text-text-3" />}
+        {loading ? (
+          <Loader2 size={18} className="animate-spin text-text-2" />
+        ) : (
+          query && (
+            <button onClick={() => setQuery("")} aria-label="Limpar">
+              <X size={18} className="text-text-2" />
+            </button>
+          )
+        )}
       </div>
 
-      <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4">
-        <Chip active={kind === "any"} onClick={() => setKind("any")}>
-          Tudo
-        </Chip>
-        {KINDS.map((k) => (
-          <Chip key={k} active={kind === k} onClick={() => setKind(k)}>
-            {KIND_META[k].plural}
-          </Chip>
+      <div className="glass no-scrollbar mt-3 inline-flex max-w-full gap-1 overflow-x-auto rounded-full p-1">
+        {(["any", ...KINDS] as const).map((k) => (
+          <button key={k} onClick={() => setKind(k)} className="relative shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium">
+            {kind === k && <motion.span layoutId="add-kind" className="btn-accent absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
+            <span className={`relative ${kind === k ? "text-white" : "text-white/70"}`}>{k === "any" ? "Tudo" : KIND_META[k].plural}</span>
+          </button>
         ))}
       </div>
 
       {error && <p className="mt-4 text-sm text-danger">{error}</p>}
 
-      <ul className="mt-3">
-        {results.map((r) => {
-          const key = `${r.kind}:${r.externalId}`;
-          return (
-            <li key={key}>
-              <button onClick={() => add(r)} disabled={!!adding} className="tap flex w-full items-center gap-3 py-2 text-left disabled:opacity-60">
-                <div className="h-[72px] w-12 shrink-0 overflow-hidden rounded-md bg-bg-3">
-                  {r.cover && <img src={r.cover} alt="" className="h-full w-full object-cover" loading="lazy" />}
+      <div className="mt-6 grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6 lg:gap-5">
+        <AnimatePresence mode="popLayout">
+          {results.map((r, idx) => {
+            const key = `${r.kind}:${r.externalId}`;
+            const st = status[key];
+            const already = owned.has(`${normalize(r.title)}|${r.year ?? ""}`);
+            const done = (st && st !== "adding") || already;
+            return (
+              <motion.div
+                key={key}
+                layout
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ delay: Math.min(idx, 12) * 0.025 }}
+                className="min-w-0"
+              >
+                <div className="group relative aspect-[2/3] overflow-hidden rounded-2xl bg-bg-3">
+                  {r.cover ? (
+                    <img src={r.cover} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  ) : (
+                    <div className="flex h-full items-end p-2.5 text-[12px] font-semibold text-white/70">{r.title}</div>
+                  )}
+                  <span className="glass absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider">{KIND_META[r.kind].label}</span>
+                  <motion.button
+                    whileTap={{ scale: 0.85 }}
+                    onClick={() => !done && st !== "adding" && add(r)}
+                    className={`absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full shadow-lg ${done ? "bg-success text-black" : "btn-accent"}`}
+                    aria-label={done ? "No backlog" : `Adicionar ${r.title}`}
+                  >
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.span key={st === "adding" ? "l" : done ? "d" : "p"} initial={{ scale: 0.3, rotate: -90 }} animate={{ scale: 1, rotate: 0 }} exit={{ scale: 0.3 }}>
+                        {st === "adding" ? <Loader2 size={18} className="animate-spin" /> : done ? <Check size={19} strokeWidth={3} /> : <Plus size={20} strokeWidth={2.6} />}
+                      </motion.span>
+                    </AnimatePresence>
+                  </motion.button>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[15px] font-medium">{r.title}</p>
-                  <p className="truncate text-[13px] text-text-2">{[r.year, r.subtitle].filter(Boolean).join(" · ")}</p>
-                </div>
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line">
-                  {adding === key ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-      {!loading && query.trim().length >= 2 && !results.length && !error && <p className="mt-6 text-center text-sm text-text-2">Nada encontrado.</p>}
+                <p className="mt-2 text-[13px] font-semibold leading-tight line-clamp-2">{r.title}</p>
+                <p className="truncate text-[11.5px] text-white/50">{[r.year, r.subtitle?.split(" · ").slice(1).join(" · ")].filter(Boolean).join(" · ")}</p>
+                {st && st !== "adding" && (
+                  <Link href={`/item/${st}`} className="text-[12px] font-medium text-accent-2">
+                    Ver →
+                  </Link>
+                )}
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+      </div>
+      {!loading && query.trim().length >= 2 && !results.length && !error && <p className="mt-10 text-center text-text-2">Nada encontrado.</p>}
+      {query.trim().length < 2 && <p className="mt-10 text-center text-[14px] text-text-3">Dica: no Android, compartilhe um link do IMDb ou da Steam direto para o app.</p>}
     </div>
   );
 }

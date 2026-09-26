@@ -22,9 +22,9 @@ export default async function AddPage({ searchParams }: PageProps<"/adicionar">)
   const initialKind = steamTitle ? "game" : "any";
 
   return (
-    <div>
+    <div className="mx-auto max-w-[1400px]">
       <PageHeader title="Adicionar" subtitle="Filmes, séries, jogos e livros numa busca só." />
-      <div className="px-4">
+      <div className="px-4 sm:px-6 lg:px-10">
         <AddSearch initialQuery={initialQuery} initialKind={initialKind} imdbId={imdbId} />
       </div>
     </div>

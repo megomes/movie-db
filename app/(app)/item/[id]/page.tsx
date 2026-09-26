@@ -1,9 +1,11 @@
 /* eslint-disable @next/next/no-img-element -- logos, fotos e fundos vêm de CDNs externos */
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronLeft, ExternalLink } from "lucide-react";
-import { GlassButton } from "@/components/glass-button";
-import { DoneButton, InterestToggle, ItemMenu, NotesEditor, PlatformToggle, WantButton } from "@/components/item-actions";
+import { CalendarDays, ChevronLeft, Clock, ExternalLink, FileText, Gamepad2, Star, Tag, Trophy } from "lucide-react";
+import { Cover } from "@/components/cover";
+import { AmbientColor, CopyButton, DoneButton, ItemMenu, NotesEditor, PinButton, PlatformToggle } from "@/components/item-actions";
 import type { Availability, CastMember, Item, Provider } from "@/lib/db/schema";
+import { artSrc, coverSrc } from "@/lib/img";
 import { accessFor, formatMinutes, KIND_META } from "@/lib/kinds";
 import { getItem, listPeople } from "@/lib/queries";
 import { getProfile, requireUser } from "@/lib/session";
@@ -13,160 +15,232 @@ export async function generateMetadata({ params }: PageProps<"/item/[id]">) {
   return { title: item?.title ?? "Item" };
 }
 
+const compact = (n: number) => Intl.NumberFormat("pt-BR", { notation: "compact" }).format(n);
+
+type Stat = { label: string; value: string; caption?: string; icon?: React.ReactNode; tone?: string; href?: string };
+
+function statsFor(item: Item): Stat[] {
+  const r = item.ratings ?? {};
+  const s: Stat[] = [];
+  if (r.imdb != null)
+    s.push({
+      label: "IMDb",
+      value: r.imdb.toFixed(1),
+      caption: r.imdbVotes ? `${compact(r.imdbVotes)} votos` : "IMDb",
+      tone: "#f5c518",
+      href: item.imdbId ? `https://www.imdb.com/title/${item.imdbId}/` : undefined,
+    });
+  if (r.rottenTomatoes != null) s.push({ label: "🍅", value: `${r.rottenTomatoes}%`, caption: "Rotten Tomatoes" });
+  if (r.metacritic != null) s.push({ label: "MC", value: String(r.metacritic), caption: "Metacritic", tone: r.metacritic >= 61 ? "#67d87a" : "#ffd166" });
+  if (r.imdb == null && r.tmdb != null) s.push({ label: "TMDB", value: r.tmdb.toFixed(1), caption: "TMDB", tone: "#01b4e4" });
+  if (r.igdb != null) s.push({ label: "IGDB", value: String(r.igdb), caption: r.igdbCount ? `${compact(r.igdbCount)} notas` : "IGDB", tone: "#9147ff" });
+  if (r.igdbCritic != null) s.push({ icon: <Trophy size={15} />, label: "", value: String(r.igdbCritic), caption: "Crítica" });
+  if (r.hardcover != null)
+    s.push({
+      icon: <Star size={15} className="fill-current" />,
+      label: "",
+      value: r.hardcover.toFixed(2),
+      caption: r.hardcoverCount ? `${compact(r.hardcoverCount)} leitores` : "Hardcover",
+      tone: "#ffd166",
+      href: item.hardcoverSlug ? `https://hardcover.app/books/${item.hardcoverSlug}` : undefined,
+    });
+  if (item.kind === "movie" && item.minutes) s.push({ icon: <Clock size={15} />, label: "", value: formatMinutes(item.minutes, "movie")!, caption: "Duração" });
+  if (item.kind === "series" && item.seasons) s.push({ icon: <Tag size={15} />, label: "", value: String(item.seasons), caption: item.seasons > 1 ? "Temporadas" : "Temporada" });
+  if (item.kind === "game" && item.minutes) s.push({ icon: <Gamepad2 size={15} />, label: "", value: formatMinutes(item.minutes, "game")!, caption: "Pra zerar" });
+  if (item.kind === "book" && item.pages) s.push({ icon: <FileText size={15} />, label: "", value: String(item.pages), caption: "Páginas" });
+  if (item.year) s.push({ icon: <CalendarDays size={15} />, label: "", value: String(item.year), caption: "Lançamento" });
+  return s;
+}
+
 export default async function ItemPage({ params }: PageProps<"/item/[id]">) {
   const user = await requireUser();
   const { id } = await params;
   const [item, profile, people] = await Promise.all([getItem(id), getProfile(user.id), listPeople()]);
   if (!item) notFound();
+  const mine = item.ownerId === user.id;
+  const owner = people.find((p) => p.userId === item.ownerId);
   const myProviders = profile?.providerIds ?? [];
   const access = accessFor(item, myProviders);
-  const art = item.backdropUrl ?? item.coverUrl;
-  const r = item.ratings ?? {};
-
-  const length =
-    item.kind === "book"
-      ? item.pages && `${item.pages} páginas`
-      : item.kind === "series"
-        ? [item.seasons && `${item.seasons} temp.`, item.episodes && `${item.episodes} ep.`].filter(Boolean).join(" · ")
-        : item.kind === "game"
-          ? item.minutes && `~${formatMinutes(item.minutes, "game")} pra zerar`
-          : formatMinutes(item.minutes, item.kind);
-
-  // Nota principal em verde (como o "95% match" da referência)
-  const main =
-    r.imdb != null
-      ? `IMDb ${r.imdb.toFixed(1)}`
-      : r.igdb != null
-        ? `IGDB ${r.igdb}`
-        : r.hardcover != null
-          ? `★ ${r.hardcover.toFixed(1)}`
-          : r.tmdb != null
-            ? `TMDB ${r.tmdb.toFixed(1)}`
-            : null;
-
-  const secondary = [
-    r.rottenTomatoes != null && `Rotten Tomatoes ${r.rottenTomatoes}%`,
-    r.metacritic != null && `Metacritic ${r.metacritic}`,
-    r.igdbCritic != null && `Crítica ${r.igdbCritic}`,
-    r.imdbVotes != null && `${Intl.NumberFormat("pt-BR", { notation: "compact" }).format(r.imdbVotes)} votos`,
-    r.hardcoverCount != null && `${r.hardcoverCount} avaliações`,
-  ].filter(Boolean) as string[];
+  const art = artSrc(item.backdropUrl, "lg");
+  const stats = statsFor(item);
+  const about = item.summary ?? item.overview;
 
   return (
-    <article>
-      {/* Preview grande, sem card */}
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-bg-2 sm:aspect-[21/9]">
-        {art && <img src={art} alt="" className={`fade-in h-full w-full object-cover ${item.backdropUrl ? "" : "scale-110 blur-2xl brightness-50"}`} />}
-        {!item.backdropUrl && item.coverUrl && (
-          <img src={item.coverUrl} alt="" className="absolute bottom-6 left-1/2 h-[78%] -translate-x-1/2 rounded-lg object-cover" />
+    <article className="relative">
+      <AmbientColor color={item.coverColor} />
+
+      {/* Arte de fundo */}
+      <div className="absolute inset-x-0 top-0 h-[58vh] overflow-hidden lg:h-[82vh]">
+        {art ? (
+          <img src={art} alt="" className="ken-burns h-full w-full object-cover" />
+        ) : (
+          <div className="h-full w-full" style={{ backgroundColor: item.coverColor ?? "#101522" }}>
+            {item.coverUrl && <img src={coverSrc(item.coverUrl, "sm")!} alt="" className="h-full w-full scale-125 object-cover opacity-60 blur-3xl saturate-150" />}
+          </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-transparent to-bg" />
-        <div className="absolute inset-x-0 top-0 flex justify-between px-4 pt-[calc(env(safe-area-inset-top)+12px)]">
-          <GlassButton href="/lista" label="Voltar">
-            <ChevronLeft size={22} />
-          </GlassButton>
-          <ItemMenu itemId={item.id} />
-        </div>
+        <div className="fade-bottom absolute inset-0" />
+        <div className="fade-left absolute inset-0 hidden lg:block" />
       </div>
 
-      <div className="space-y-6 px-4">
-        <header>
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-[0.14em] text-text-2">{KIND_META[item.kind].label}</p>
-              <h1 className="mt-1 text-[24px] font-semibold leading-tight">{item.title}</h1>
-              {item.originalTitle && item.originalTitle !== item.title && <p className="text-sm text-text-2">{item.originalTitle}</p>}
+      <div className="relative mx-auto max-w-[1400px] px-4 pt-[calc(env(safe-area-inset-top)+12px)] sm:px-6 lg:px-10 lg:pt-28">
+        <Link href="/lista" className="glass tap inline-flex h-10 items-center gap-1 rounded-full pl-2.5 pr-4 text-[14px]">
+          <ChevronLeft size={20} /> Voltar
+        </Link>
+
+        <div className="mt-[22vh] grid gap-7 lg:mt-[26vh] lg:grid-cols-[300px_1fr] lg:gap-12">
+          <div className="mx-auto w-[58%] max-w-[260px] lg:mx-0 lg:w-full lg:max-w-none">
+            <div className="rounded-3xl shadow-[0_30px_80px_rgb(0_0_0/0.65)]">
+              <Cover
+                item={{ id: item.id, title: item.title, kind: item.kind, coverUrl: item.coverUrl, coverColor: item.coverColor, coverBlur: item.coverBlur }}
+                size="lg"
+                morph
+                eager
+                rounded="rounded-3xl"
+              />
             </div>
-            <WantButton itemId={item.id} initial={item.interestedIds.includes(user.id)} />
           </div>
 
-          <p className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px] text-text-2">
-            {main && <span className="font-medium text-success">{main}</span>}
-            {item.year && <span>{item.year}</span>}
-            {length && <span>{length}</span>}
-            {item.kind === "game" && item.myPlatforms.length > 0 && <span>{item.myPlatforms.join(" · ")}</span>}
-          </p>
-          {secondary.length > 0 && <p className="mt-1 text-[13px] text-text-3">{secondary.join(" · ")}</p>}
-          {access.tier !== "unknown" && item.kind !== "book" && (
-            <p className={`mt-2 text-[14px] font-medium ${access.tier === "mine" ? "text-success" : "text-text"}`}>{access.label}</p>
-          )}
+          <div className="min-w-0 lg:pt-10">
+            {!mine && owner && <p className="mb-2 text-[13px] font-medium text-accent-2">Do backlog de {owner.name?.split(" ")[0]}</p>}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="glass rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]">{KIND_META[item.kind].label}</span>
+              {[item.category, ...item.genres.slice(0, 3)].filter(Boolean).map((g) => (
+                <span key={g} className="rounded-full border border-white/15 px-3 py-1 text-[12px] text-white/75">
+                  {g}
+                </span>
+              ))}
+            </div>
+            <h1 className="mt-4 text-[34px] font-bold leading-[1.02] tracking-tight lg:text-[60px]">{item.title}</h1>
+            {item.originalTitle && item.originalTitle !== item.title && <p className="mt-1.5 text-[15px] text-white/55">{item.originalTitle}</p>}
+            {item.creators.length > 0 && <p className="mt-2 text-[15px] text-white/75">{item.creators.slice(0, 3).join(", ")}</p>}
 
-          <DoneButton itemId={item.id} kind={item.kind} />
-        </header>
+            {/* Blocos de números (inspirados na referência) */}
+            <div className="no-scrollbar -mx-4 mt-6 flex gap-2.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
+              {stats.map((s) => {
+                const body = (
+                  <>
+                    <span className="flex h-5 items-center gap-1 text-[12px] font-black tracking-tight" style={{ color: s.tone ?? "rgb(255 255 255 / 0.7)" }}>
+                      {s.icon}
+                      {s.label}
+                    </span>
+                    <span className="mt-1.5 text-[19px] font-bold tabular-nums leading-none">{s.value}</span>
+                    {s.caption && <span className="mt-1 text-[10.5px] text-white/50">{s.caption}</span>}
+                  </>
+                );
+                const cls = "glass flex min-w-[84px] shrink-0 flex-col items-start rounded-2xl px-3.5 py-3 transition-colors hover:bg-white/5";
+                return s.href ? (
+                  <a key={s.caption} href={s.href} target="_blank" rel="noreferrer" className={cls}>
+                    {body}
+                  </a>
+                ) : (
+                  <div key={s.caption} className={cls}>
+                    {body}
+                  </div>
+                );
+              })}
+            </div>
 
-        {(item.summary || item.overview) && (
-          <section>
-            <h2 className="mb-2 text-[20px] font-semibold">Sinopse</h2>
-            {item.summary && <p className="text-[14px] leading-[1.5] text-text-2">{item.summary}</p>}
-            {item.overview && item.overview !== item.summary && (
-              <p className={`text-[14px] leading-[1.5] text-text-2 ${item.summary ? "mt-3 text-text-3" : ""}`}>{item.overview}</p>
+            {item.kind !== "book" && access.tier !== "unknown" && (
+              <p className={`mt-5 flex items-center gap-2 text-[15px] font-medium ${access.tier === "mine" ? "text-success" : "text-white/85"}`}>
+                <span className={`h-2 w-2 rounded-full ${access.tier === "mine" ? "bg-success" : "bg-white/50"}`} /> {access.label}
+              </p>
             )}
-            {(item.category || item.genres.length > 0) && (
-              <p className="mt-3 text-[13px] text-text-3">{[item.category, ...item.genres].filter(Boolean).join(" · ")}</p>
+
+            <div className="mt-6 flex items-center gap-2.5">
+              {mine ? (
+                <>
+                  <DoneButton itemId={item.id} kind={item.kind} />
+                  <PinButton itemId={item.id} initial={item.pinned} />
+                  <ItemMenu itemId={item.id} />
+                </>
+              ) : (
+                <CopyButton itemId={item.id} />
+              )}
+            </div>
+
+            {about && <p className="mt-7 max-w-3xl text-[15px] leading-[1.65] text-white/75 lg:text-[16px]">{about}</p>}
+            {item.summary && item.overview && item.overview !== item.summary && (
+              <details className="mt-3 max-w-3xl text-[14px] text-white/55">
+                <summary className="cursor-pointer select-none text-white/70 hover:text-white">Sinopse completa</summary>
+                <p className="mt-2 leading-relaxed">{item.overview}</p>
+              </details>
             )}
-          </section>
-        )}
+          </div>
+        </div>
 
-        <section>
-          <h2 className="mb-3 text-[20px] font-semibold">{item.kind === "game" ? "Onde jogar" : item.kind === "book" ? "Onde encontrar" : "Onde assistir"}</h2>
-          {(item.kind === "movie" || item.kind === "series") && <Providers availability={item.availability} myProviders={myProviders} />}
-          {item.kind === "game" && <GameWhere item={item} />}
-          {item.kind === "book" && <BookWhere item={item} />}
-        </section>
+        <div className="mt-12 grid gap-10 lg:grid-cols-[1fr_380px] lg:gap-14">
+          <div className="min-w-0 space-y-10">
+            <section>
+              <SectionTitle>{item.kind === "game" ? "Onde jogar" : item.kind === "book" ? "Onde encontrar" : "Assistir online"}</SectionTitle>
+              {(item.kind === "movie" || item.kind === "series") && <Providers availability={item.availability} myProviders={myProviders} />}
+              {item.kind === "game" && <GameWhere item={item} mine={mine} />}
+              {item.kind === "book" && <BookWhere item={item} />}
+            </section>
+            {item.cast.length > 0 && <Cast title={item.kind === "book" ? "Autoria" : "Elenco"} people={item.cast} />}
+          </div>
 
-        {item.cast.length > 0 && <Cast title={item.kind === "book" ? "Autoria" : "Elenco"} people={item.cast} />}
-        {item.cast.length === 0 && item.creators.length > 0 && (
-          <section>
-            <h2 className="mb-1 text-[20px] font-semibold">{item.kind === "game" ? "Estúdio" : "Criação"}</h2>
-            <p className="text-[14px] text-text-2">{item.creators.join(", ")}</p>
-          </section>
-        )}
-
-        <section>
-          <h2 className="mb-3 text-[20px] font-semibold">Quem quer</h2>
-          <InterestToggle people={people} interestedIds={item.interestedIds} />
-        </section>
-
-        <section>
-          <h2 className="mb-2 text-[20px] font-semibold">Notas</h2>
-          <NotesEditor itemId={item.id} initial={item.notes ?? ""} />
-        </section>
-
-        {item.matchStatus !== "matched" && (
-          <a href={`/revisar?item=${item.id}`} className="block text-sm text-text-2 underline decoration-line underline-offset-4">
-            Não tenho certeza se é esse item. Conferir →
-          </a>
-        )}
-
-        <p className="pb-6 text-[11px] leading-relaxed text-text-3">
-          {item.kind === "movie" || item.kind === "series"
-            ? "Disponibilidade por JustWatch via TMDB. Notas via OMDb."
-            : item.kind === "game"
-              ? "Dados via IGDB. Preço via Steam."
-              : "Dados via Google Books. Nota via Hardcover."}
-          {item.enrichedAt && ` Atualizado em ${item.enrichedAt.toLocaleDateString("pt-BR")}.`}
-        </p>
+          <aside className="space-y-10">
+            {mine && (
+              <section>
+                <SectionTitle>Suas notas</SectionTitle>
+                <NotesEditor itemId={item.id} initial={item.notes ?? ""} />
+              </section>
+            )}
+            {mine && item.matchStatus !== "matched" && (
+              <Link href={`/revisar?item=${item.id}`} className="glass block rounded-2xl p-4 text-[14px] text-white/80 hover:bg-white/5">
+                Não tenho certeza se é esse item. <span className="font-semibold text-accent-2">Conferir →</span>
+              </Link>
+            )}
+            <p className="text-[11px] leading-relaxed text-white/35">
+              {item.kind === "movie" || item.kind === "series"
+                ? "Disponibilidade por JustWatch via TMDB. Notas via OMDb."
+                : item.kind === "game"
+                  ? "Dados via IGDB. Preço via Steam."
+                  : "Dados via Google Books. Nota via Hardcover."}
+              {item.enrichedAt && ` Atualizado em ${item.enrichedAt.toLocaleDateString("pt-BR")}.`}
+            </p>
+          </aside>
+        </div>
       </div>
     </article>
   );
 }
 
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <h2 className="mb-4 text-[22px] font-bold tracking-tight">{children}</h2>;
+}
+
 function Cast({ title, people }: { title: string; people: CastMember[] }) {
   return (
     <section>
-      <h2 className="mb-3 text-[20px] font-semibold">{title}</h2>
-      <div className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4">
+      <SectionTitle>{title}</SectionTitle>
+      <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         {people.map((p) => (
-          <div key={`${p.name}-${p.role}`} className="w-[76px] shrink-0 text-center">
-            <div className="mx-auto h-[52px] w-[52px] overflow-hidden rounded-full bg-bg-3">
-              {p.photo && <img src={p.photo} alt="" loading="lazy" className="h-full w-full object-cover" />}
+          <div key={`${p.name}-${p.role}`} className="w-[84px] shrink-0">
+            <div className="h-[84px] w-[84px] overflow-hidden rounded-2xl bg-bg-3">
+              {p.photo ? (
+                <img src={p.photo} alt="" loading="lazy" className="h-full w-full object-cover" />
+              ) : (
+                <span className="flex h-full items-center justify-center text-[22px] font-bold text-white/30">{p.name[0]}</span>
+              )}
             </div>
-            <p className="mt-1.5 truncate text-[12px] font-medium">{p.name}</p>
-            {p.role && <p className="truncate text-[11px] text-text-2">{p.role}</p>}
+            <p className="mt-2 truncate text-[12.5px] font-semibold">{p.name}</p>
+            {p.role && <p className="truncate text-[11px] text-white/50">{p.role}</p>}
           </div>
         ))}
       </div>
     </section>
+  );
+}
+
+function ProviderIcon({ p, mine }: { p: Provider; mine: boolean }) {
+  return (
+    <div className="w-[68px] shrink-0 text-center" title={p.name}>
+      <div className={`relative mx-auto h-[60px] w-[60px] overflow-hidden rounded-[18px] shadow-lg ${mine ? "ring-2 ring-success ring-offset-2 ring-offset-bg" : ""}`}>
+        {p.logo && <img src={p.logo} alt={p.name} className="h-full w-full object-cover" />}
+      </div>
+      <p className="mt-1.5 truncate text-[11px] text-white/60">{p.name}</p>
+    </div>
   );
 }
 
@@ -179,27 +253,22 @@ function Providers({ availability: a, myProviders }: { availability: Availabilit
   ];
   const any = groups.some(([, l]) => l?.length);
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {groups
         .filter(([, l]) => l?.length)
         .map(([label, list]) => (
           <div key={label}>
-            <p className="mb-2 text-[13px] text-text-2">{label}</p>
-            <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4">
+            <p className="mb-2.5 text-[12px] font-semibold uppercase tracking-wider text-white/45">{label}</p>
+            <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
               {list!.map((p) => (
-                <div key={p.id} className="w-14 shrink-0 text-center" title={p.name}>
-                  <div className={`relative mx-auto h-12 w-12 overflow-hidden rounded-[10px] ${myProviders.includes(p.id) ? "ring-2 ring-success" : ""}`}>
-                    {p.logo && <img src={p.logo} alt={p.name} className="h-full w-full object-cover" />}
-                  </div>
-                  <p className="mt-1 truncate text-[10px] text-text-2">{p.name}</p>
-                </div>
+                <ProviderIcon key={p.id} p={p} mine={myProviders.includes(p.id)} />
               ))}
             </div>
           </div>
         ))}
-      {!any && <p className="text-[14px] text-text-2">Nenhum serviço oferece no Brasil por enquanto. O app avisa quando aparecer.</p>}
+      {!any && <p className="glass rounded-2xl p-4 text-[14px] text-white/70">Nenhum serviço oferece no Brasil por enquanto. O app avisa quando aparecer.</p>}
       {a.link && (
-        <a href={a.link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[13px] text-text-2">
+        <a href={a.link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[13px] text-white/55 hover:text-white">
           Todas as opções <ExternalLink size={12} />
         </a>
       )}
@@ -209,28 +278,33 @@ function Providers({ availability: a, myProviders }: { availability: Availabilit
 
 function LinkPill({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <a href={href} target="_blank" rel="noreferrer" className="tap inline-flex h-9 items-center gap-1.5 rounded-full border border-line px-4 text-[14px]">
-      {children}
+    <a href={href} target="_blank" rel="noreferrer" className="glass tap inline-flex h-11 items-center gap-2 rounded-full px-5 text-[14px] font-medium hover:bg-white/5">
+      {children} <ExternalLink size={13} className="text-white/45" />
     </a>
   );
 }
 
-function GameWhere({ item }: { item: Item }) {
+function GameWhere({ item, mine }: { item: Item; mine: boolean }) {
   const p = item.steamPrice;
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="flex flex-wrap gap-2">
         {item.steamAppId && (
           <LinkPill href={`https://store.steampowered.com/app/${item.steamAppId}/`}>
             Steam {p?.isFree ? "· Grátis" : p?.formatted ? `· ${p.formatted}` : ""}
-            {p?.discountPercent ? <span className="font-medium text-success">-{p.discountPercent}%</span> : null}
+            {p?.discountPercent ? <span className="rounded-md bg-success px-1.5 text-[12px] font-bold text-black">-{p.discountPercent}%</span> : null}
           </LinkPill>
         )}
         {item.myPlatforms.includes("Switch") && <LinkPill href={`https://www.nintendo.com/pt-br/search/#q=${encodeURIComponent(item.title)}`}>eShop</LinkPill>}
-        {item.gamePass && <span className="inline-flex h-9 items-center rounded-full border border-success/50 px-4 text-[14px] text-success">Game Pass (nuvem)</span>}
+        {item.gamePass && <span className="inline-flex h-11 items-center rounded-full bg-success/15 px-5 text-[14px] font-medium text-success">Game Pass (nuvem)</span>}
       </div>
-      <PlatformToggle itemId={item.id} current={item.myPlatforms} />
-      {item.platforms.length > 0 && <p className="text-[13px] text-text-3">Lançado para {item.platforms.join(", ")}</p>}
+      {mine && (
+        <div>
+          <p className="mb-2.5 text-[12px] font-semibold uppercase tracking-wider text-white/45">Quero jogar no</p>
+          <PlatformToggle itemId={item.id} current={item.myPlatforms} />
+        </div>
+      )}
+      {item.platforms.length > 0 && <p className="text-[13px] text-white/45">Lançado para {item.platforms.join(", ")}</p>}
     </div>
   );
 }

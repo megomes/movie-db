@@ -4,6 +4,7 @@ import { getTmdbDetails, searchTmdb } from "@/lib/sources/tmdb";
 import { getOmdbRatings } from "@/lib/sources/omdb";
 import { getIgdbDetails, getSteamPrice, PLATFORM, searchIgdb } from "@/lib/sources/igdb";
 import { getBookDetails, searchBooks } from "@/lib/sources/books";
+import { analyzeCover, fallbackBookCover } from "@/lib/palette";
 
 export type SearchHint = { author?: string | null; year?: number | null; myPlatforms?: string[] };
 
@@ -65,9 +66,22 @@ export async function enrich(kind: Kind, externalId: string, hint: SearchHint = 
       }
       break;
     }
-    case "book":
-      data = await getBookDetails(externalId, hint);
+    case "book": {
+      const { altCover, ...book } = await getBookDetails(externalId, hint);
+      data = book;
+      const info = await analyzeCover(data.coverUrl);
+      if (info) Object.assign(data, { coverColor: info.color, coverBlur: info.blur });
+      else {
+        // Capa do Google inválida ("imagem indisponível"): tenta Open Library e Hardcover
+        const fb = await fallbackBookCover(data.isbn ?? null, altCover);
+        Object.assign(data, fb ? { coverUrl: fb.url, coverColor: fb.info.color, coverBlur: fb.info.blur } : { coverUrl: null });
+      }
       break;
+    }
+  }
+  if (kind !== "book") {
+    const info = await analyzeCover(data.coverUrl);
+    if (info) Object.assign(data, { coverColor: info.color, coverBlur: info.blur });
   }
   data.score = computeScore(kind, data.ratings ?? {});
   data.enrichedAt = new Date();

@@ -1,17 +1,26 @@
-import { BottomNav } from "@/components/bottom-nav";
-import { countReview } from "@/lib/queries";
-import { requireUser } from "@/lib/session";
+import { AppShell } from "@/components/app-shell";
+import { BacklogProvider } from "@/components/backlog-context";
+import { listItems, listPeople, toLite } from "@/lib/queries";
+import { getProfile, requireUser } from "@/lib/session";
 
 // Tudo aqui depende da sessão do usuário
 export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
-  await requireUser();
-  const reviewCount = await countReview();
+  const user = await requireUser();
+  const [rows, profile, people] = await Promise.all([listItems(user.id), getProfile(user.id), listPeople()]);
+  const items = rows.map(toLite);
+  const reviewCount = rows.filter((r) => r.matchStatus !== "matched").length;
+
   return (
-    <>
-      <main className="mx-auto w-full max-w-5xl pb-nav">{children}</main>
-      <BottomNav reviewCount={reviewCount} />
-    </>
+    <BacklogProvider
+      items={items}
+      me={{ id: user.id, name: user.name, email: user.email, image: user.image }}
+      people={people.filter((p) => !p.email.endsWith(".test") || p.userId === user.id)}
+      myProviders={profile?.providerIds ?? []}
+      reviewCount={reviewCount}
+    >
+      <AppShell>{children}</AppShell>
+    </BacklogProvider>
   );
 }

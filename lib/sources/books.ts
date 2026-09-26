@@ -100,7 +100,10 @@ async function hardcoverSearch(title: string, author?: string | null) {
   return best && best.s >= 1 ? best.d : null;
 }
 
-export async function getBookDetails(googleId: string, hint?: { author?: string | null }): Promise<Partial<NewItem>> {
+export async function getBookDetails(
+  googleId: string,
+  hint?: { author?: string | null },
+): Promise<Partial<NewItem> & { altCover?: string | null }> {
   const v = await gbFetch<Volume>(`volumes/${googleId}`);
   const info = v.volumeInfo;
   const authors = info.authors ?? (hint?.author ? [hint.author] : []);
@@ -121,6 +124,7 @@ export async function getBookDetails(googleId: string, hint?: { author?: string 
 
   return {
     kind: "book",
+    altCover: hc?.image?.url ?? null,
     googleBooksId: v.id,
     hardcoverSlug: hc?.slug ?? null,
     isbn,
