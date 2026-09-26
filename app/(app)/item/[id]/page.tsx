@@ -5,6 +5,7 @@ import { CalendarDays, ChevronLeft, Clock, ExternalLink, FileText, Gamepad2, Sta
 import { Cover } from "@/components/cover";
 import { AmbientColor, CopyButton, DoneBadge, DoneButton, ItemMenu, ItemTags, NotesEditor, PinButton } from "@/components/item-actions";
 import { Gallery, TrailerButton } from "@/components/media-gallery";
+import { COLLECTIONS, isShared } from "@/lib/collections";
 import { displayGenres } from "@/lib/genres";
 import type { Availability, CastMember, Item, Provider } from "@/lib/db/schema";
 import { artSrc, coverSrc } from "@/lib/img";
@@ -59,7 +60,9 @@ export default async function ItemPage({ params }: PageProps<"/item/[id]">) {
   const { id } = await params;
   const [item, profile, people, tags] = await Promise.all([getItem(id), getProfile(user.id), listPeople(), listTags(user.id)]);
   if (!item) notFound();
-  const mine = item.ownerId === user.id;
+  // Lista compartilhada (Livros para o Felipe): todo mundo edita, mas não é backlog pessoal (sem "já li", sem tags)
+  const collection = isShared(item.ownerId) ? COLLECTIONS[item.ownerId] : null;
+  const mine = item.ownerId === user.id || !!collection;
   const owner = people.find((p) => p.userId === item.ownerId);
   const myProviders = profile?.providerIds ?? [];
   const access = accessFor(item, myProviders);
@@ -94,7 +97,7 @@ export default async function ItemPage({ params }: PageProps<"/item/[id]">) {
         </div>
 
         <div className="relative mx-auto max-w-[1400px] px-4 pb-6 pt-[calc(env(safe-area-inset-top)+12px)] sm:px-6 lg:px-10 lg:pb-10 lg:pt-28">
-          <Link href="/lista" className="glass tap inline-flex h-10 items-center gap-1 rounded-full pl-2.5 pr-4 text-[14px]">
+          <Link href={collection ? "/lista?k=book" : "/lista"} className="glass tap inline-flex h-10 items-center gap-1 rounded-full pl-2.5 pr-4 text-[14px]">
             <ChevronLeft size={20} /> Voltar
           </Link>
 
@@ -113,10 +116,11 @@ export default async function ItemPage({ params }: PageProps<"/item/[id]">) {
             </div>
 
             <div className="min-w-0 flex-1">
+              {collection && <p className="mb-2 text-[13px] font-medium text-accent-2">{collection.title}</p>}
               {!mine && owner && <p className="mb-2 text-[13px] font-medium text-accent-2">Do backlog de {owner.name?.split(" ")[0]}</p>}
               <div className="flex flex-wrap items-center gap-2">
                 <span className="glass rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]">{KIND_META[item.kind].label}</span>
-                <ItemTags itemId={item.id} kind={item.kind} title={item.title} cover={coverThumb} tagIds={mine ? item.tagIds : []} editable={mine} />
+                <ItemTags itemId={item.id} kind={item.kind} title={item.title} cover={coverThumb} tagIds={mine && !collection ? item.tagIds : []} editable={mine && !collection} />
                 {genres.map((g) => (
                   <span key={g} className="glass rounded-full px-3 py-1 text-[12px] text-white/80">
                     {g}
@@ -169,10 +173,14 @@ export default async function ItemPage({ params }: PageProps<"/item/[id]">) {
               <div className="mt-5 flex flex-wrap items-center gap-2.5">
                 {mine ? (
                   <>
-                    {item.doneAt ? <DoneBadge itemId={item.id} kind={item.kind} doneAt={item.doneAt.toISOString()} /> : <DoneButton itemId={item.id} kind={item.kind} />}
+                    {collection ? null : item.doneAt ? (
+                      <DoneBadge itemId={item.id} kind={item.kind} doneAt={item.doneAt.toISOString()} />
+                    ) : (
+                      <DoneButton itemId={item.id} kind={item.kind} />
+                    )}
                     {item.trailer && <TrailerButton videoId={item.trailer} title={item.title} />}
                     <PinButton itemId={item.id} initial={item.pinned} />
-                    <ItemMenu itemId={item.id} />
+                    <ItemMenu itemId={item.id} shared={!!collection} canRefresh={!!(item.googleBooksId ?? item.tmdbId ?? item.igdbId)} />
                   </>
                 ) : (
                   <>
@@ -216,7 +224,7 @@ export default async function ItemPage({ params }: PageProps<"/item/[id]">) {
           <aside className="space-y-8">
             {mine && (
               <section>
-                <SectionTitle>Suas notas</SectionTitle>
+                <SectionTitle>{collection ? "Notas da família" : "Suas notas"}</SectionTitle>
                 <NotesEditor itemId={item.id} initial={item.notes ?? ""} />
               </section>
             )}
@@ -358,10 +366,18 @@ function GameWhere({ item }: { item: Item }) {
   );
 }
 
+// Link salvo à mão (Livros para o Felipe): "Amazon" ou o domínio da loja
+function storeName(url: string) {
+  const host = URL.canParse(url) ? new URL(url).hostname.replace(/^www\./, "") : "Loja";
+  return /amazon|amzn|^a\.co$/.test(host) ? "Amazon" : host;
+}
+
 function BookWhere({ item }: { item: Item }) {
   const q = encodeURIComponent([item.title, item.creators[0]].filter(Boolean).join(" "));
+  const link = item.availability.link;
   return (
     <div className="flex flex-wrap gap-2">
+      {link && <LinkPill href={link}>{storeName(link)}</LinkPill>}
       <LinkPill href={`https://www.amazon.com.br/s?k=${q}&i=stripbooks`}>Amazon</LinkPill>
       <LinkPill href={`https://www.amazon.com.br/s?k=${q}&i=digital-text`}>Kindle</LinkPill>
       <LinkPill href={`https://www.skoob.com.br/livro/lista/busca:${q}`}>Skoob</LinkPill>

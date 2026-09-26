@@ -359,7 +359,7 @@ export function ItemTags({ itemId, kind, title, cover, tagIds, editable }: { ite
   );
 }
 
-export function ItemMenu({ itemId }: { itemId: string }) {
+export function ItemMenu({ itemId, shared = false, canRefresh = true }: { itemId: string; shared?: boolean; canRefresh?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
@@ -380,29 +380,31 @@ export function ItemMenu({ itemId }: { itemId: string }) {
               transition={{ duration: 0.16 }}
               className="glass-strong absolute right-0 top-14 z-50 w-60 origin-top-right rounded-2xl p-1.5"
             >
-              <button
-                className={row}
-                onClick={() => {
-                  setOpen(false);
-                  start(() => reenrich(itemId));
-                }}
-              >
-                <RefreshCw size={17} className="text-text-2" /> Atualizar dados
-              </button>
+              {canRefresh && (
+                <button
+                  className={row}
+                  onClick={() => {
+                    setOpen(false);
+                    start(() => reenrich(itemId));
+                  }}
+                >
+                  <RefreshCw size={17} className="text-text-2" /> Atualizar dados
+                </button>
+              )}
               <Link href={`/revisar?item=${itemId}`} className={row}>
                 <Replace size={17} className="text-text-2" /> Não é esse? Trocar
               </Link>
               <button
                 className={`${row} text-danger`}
                 onClick={() => {
-                  if (confirm("Remover do backlog? (é tirar porque não quer mais, não “já vi”)"))
+                  if (confirm(shared ? "Remover da lista? Some pra todo mundo." : "Remover do backlog? (é tirar porque não quer mais, não “já vi”)"))
                     start(async () => {
                       await deleteItem(itemId);
-                      router.push("/lista");
+                      router.push(shared ? "/lista?k=book" : "/lista");
                     });
                 }}
               >
-                <Trash2 size={17} /> Remover do backlog
+                <Trash2 size={17} /> {shared ? "Remover da lista" : "Remover do backlog"}
               </button>
             </motion.div>
           </>

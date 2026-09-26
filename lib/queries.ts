@@ -14,6 +14,16 @@ export async function listItems(ownerId: string) {
     .orderBy(desc(items.createdAt));
 }
 
+// Lista compartilhada (ex.: Livros para o Felipe): igual para todo mundo
+export async function listCollection(ownerId: string) {
+  const rows = await db
+    .select()
+    .from(items)
+    .where(and(eq(items.ownerId, ownerId), isNull(items.doneAt)))
+    .orderBy(desc(items.createdAt));
+  return rows.map(toLite);
+}
+
 export async function countDone(ownerId: string) {
   const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(items).where(and(eq(items.ownerId, ownerId), isNotNull(items.doneAt)));
   return row?.n ?? 0;
