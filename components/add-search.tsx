@@ -4,8 +4,8 @@
 import Link from "next/link";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Check, Link2, Loader2, Plus, Search, X } from "lucide-react";
-import { addItem, addLink, resolveImdb } from "@/app/actions";
+import { Check, Loader2, Plus, Search, X } from "lucide-react";
+import { addItem, resolveImdb } from "@/app/actions";
 import type { Kind } from "@/lib/db/schema";
 import { KIND_META, KINDS } from "@/lib/kinds";
 import type { SearchResult as Result } from "@/lib/search";
@@ -158,9 +158,7 @@ export function AddSearch({
         )}
       </div>
 
-      {collection ? (
-        <LinkForm collection={collection} />
-      ) : (
+      {!collection && (
       <div className="glass no-scrollbar mt-3 inline-flex max-w-full gap-1 overflow-x-auto rounded-full p-1">
         {(["any", ...KINDS] as const).map((k) => (
           <button key={k} onClick={() => setKind(k)} className="relative shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium">
@@ -220,54 +218,3 @@ const ResultCard = memo(function ResultCard({ r, idx, st, already, onAdd }: { r:
   );
 });
 
-// Livro que a busca não acha (livro-brinquedo, importado…): título + link da loja
-function LinkForm({ collection }: { collection: string }) {
-  const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState("");
-  const [url, setUrl] = useState("");
-  const [cover, setCover] = useState("");
-  const [state, setState] = useState<"idle" | "saving" | "error" | string>("idle");
-  const saved = state !== "idle" && state !== "saving" && state !== "error";
-
-  if (!open)
-    return (
-      <button onClick={() => setOpen(true)} className="glass tap mt-3 flex h-10 items-center gap-2 rounded-full px-4 text-[13px] font-medium text-white/80 hover:text-white">
-        <Link2 size={15} /> Não achou? Adicionar pelo link da loja
-      </button>
-    );
-
-  const input = "glass h-11 w-full rounded-2xl px-4 text-[14px] outline-none placeholder:text-text-3 focus:border-accent/60";
-  return (
-    <form
-      className="glass mt-3 space-y-2.5 rounded-3xl p-4"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        setState("saving");
-        try {
-          const id = await addLink(collection, { title, url, cover });
-          setState(id);
-          setTitle("");
-          setUrl("");
-          setCover("");
-        } catch {
-          setState("error");
-        }
-      }}
-    >
-      <input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título (ex.: Livro Magnético - Profissões, Janod)" className={input} />
-      <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Link da loja (Amazon, etc.)" className={input} />
-      <input type="url" value={cover} onChange={(e) => setCover(e.target.value)} placeholder="Link da imagem da capa (opcional)" className={input} />
-      <div className="flex items-center gap-3">
-        <button disabled={state === "saving" || !title.trim()} className="btn-accent tap flex h-11 items-center gap-2 rounded-full px-5 text-[14px] font-semibold disabled:opacity-50">
-          {state === "saving" ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Adicionar
-        </button>
-        {saved && (
-          <Link href={`/item/${state}`} className="text-[13px] font-medium text-success">
-            Adicionado · ver →
-          </Link>
-        )}
-        {state === "error" && <span className="text-[13px] text-danger">Não deu certo. Tenta de novo.</span>}
-      </div>
-    </form>
-  );
-}

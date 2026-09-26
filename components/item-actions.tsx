@@ -359,7 +359,7 @@ export function ItemTags({ itemId, kind, title, cover, tagIds, editable }: { ite
   );
 }
 
-export function ItemMenu({ itemId, shared = false, canRefresh = true }: { itemId: string; shared?: boolean; canRefresh?: boolean }) {
+export function ItemMenu({ itemId, shared = false }: { itemId: string; shared?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
@@ -380,17 +380,15 @@ export function ItemMenu({ itemId, shared = false, canRefresh = true }: { itemId
               transition={{ duration: 0.16 }}
               className="glass-strong absolute right-0 top-14 z-50 w-60 origin-top-right rounded-2xl p-1.5"
             >
-              {canRefresh && (
-                <button
-                  className={row}
-                  onClick={() => {
-                    setOpen(false);
-                    start(() => reenrich(itemId));
-                  }}
-                >
-                  <RefreshCw size={17} className="text-text-2" /> Atualizar dados
-                </button>
-              )}
+              <button
+                className={row}
+                onClick={() => {
+                  setOpen(false);
+                  start(() => reenrich(itemId));
+                }}
+              >
+                <RefreshCw size={17} className="text-text-2" /> Atualizar dados
+              </button>
               <Link href={`/revisar?item=${itemId}`} className={row}>
                 <Replace size={17} className="text-text-2" /> Não é esse? Trocar
               </Link>

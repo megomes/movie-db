@@ -180,7 +180,7 @@ export default async function ItemPage({ params }: PageProps<"/item/[id]">) {
                     )}
                     {item.trailer && <TrailerButton videoId={item.trailer} title={item.title} />}
                     <PinButton itemId={item.id} initial={item.pinned} />
-                    <ItemMenu itemId={item.id} shared={!!collection} canRefresh={!!(item.googleBooksId ?? item.tmdbId ?? item.igdbId)} />
+                    <ItemMenu itemId={item.id} shared={!!collection} />
                   </>
                 ) : (
                   <>
@@ -366,18 +366,10 @@ function GameWhere({ item }: { item: Item }) {
   );
 }
 
-// Link salvo à mão (Livros para o Felipe): "Amazon" ou o domínio da loja
-function storeName(url: string) {
-  const host = URL.canParse(url) ? new URL(url).hostname.replace(/^www\./, "") : "Loja";
-  return /amazon|amzn|^a\.co$/.test(host) ? "Amazon" : host;
-}
-
 function BookWhere({ item }: { item: Item }) {
   const q = encodeURIComponent([item.title, item.creators[0]].filter(Boolean).join(" "));
-  const link = item.availability.link;
   return (
     <div className="flex flex-wrap gap-2">
-      {link && <LinkPill href={link}>{storeName(link)}</LinkPill>}
       <LinkPill href={`https://www.amazon.com.br/s?k=${q}&i=stripbooks`}>Amazon</LinkPill>
       <LinkPill href={`https://www.amazon.com.br/s?k=${q}&i=digital-text`}>Kindle</LinkPill>
       <LinkPill href={`https://www.skoob.com.br/livro/lista/busca:${q}`}>Skoob</LinkPill>

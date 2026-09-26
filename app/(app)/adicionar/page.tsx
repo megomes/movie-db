@@ -29,7 +29,7 @@ export default async function AddPage({ searchParams }: PageProps<"/adicionar">)
   return (
     <div className="mx-auto max-w-[1400px]">
       {collection ? (
-        <PageHeader title={COLLECTIONS[collection].title} subtitle="Busque o livro ou cole o link da loja. Aparece pra todo mundo." />
+        <PageHeader title={COLLECTIONS[collection].title} subtitle="Busque no Google Books. O que entrar aparece pra todo mundo." />
       ) : (
         <PageHeader title="Adicionar" subtitle="Filmes, séries, jogos e livros numa busca só." />
       )}

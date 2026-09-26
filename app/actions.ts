@@ -6,7 +6,6 @@ import { db, items, profiles, pushSubscriptions, tags, type Kind } from "@/lib/d
 import { requireUser } from "@/lib/session";
 import { isShared } from "@/lib/collections";
 import { enrich } from "@/lib/enrich";
-import { analyzeCover } from "@/lib/palette";
 import { findByImdbId } from "@/lib/sources/tmdb";
 
 const KINDS = new Set<Kind>(["movie", "series", "game", "book"]);
@@ -83,34 +82,6 @@ export async function addItem(kind: string, externalId: string, tagIds: string[]
   const [row] = await db
     .insert(items)
     .values({ title: "", ...data, kind: k, ownerId, source: "manual", matchStatus: "matched", tagIds: t.tagIds, ...legacyFields(k, t.names) })
-    .returning({ id: items.id });
-  refresh();
-  return row.id;
-}
-
-// Livro que não está no Google Books (livro-brinquedo, importado…): título + link da loja + capa opcional
-export async function addLink(collection: string, input: { title: string; url: string; cover?: string }) {
-  await requireUser();
-  if (!isShared(collection)) throw new Error("Lista inválida");
-  const title = input.title.trim().slice(0, 200);
-  const http = (u?: string) => (u && /^https?:\/\/\S+$/i.test(u.trim()) ? u.trim() : null);
-  const url = http(input.url);
-  const cover = http(input.cover);
-  if (!title) throw new Error("Falta o título");
-  const info = await analyzeCover(cover);
-  const [row] = await db
-    .insert(items)
-    .values({
-      kind: "book",
-      title,
-      coverUrl: info ? cover : null,
-      coverColor: info?.color,
-      coverBlur: info?.blur,
-      availability: url ? { link: url } : {},
-      ownerId: collection,
-      source: "link",
-      matchStatus: "matched",
-    })
     .returning({ id: items.id });
   refresh();
   return row.id;
