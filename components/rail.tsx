@@ -5,6 +5,7 @@ import { useCallback, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, ChevronRight as Arrow } from "lucide-react";
 import type { LiteItem } from "@/lib/queries";
 import { Cover } from "./cover";
+import { attachDragScroll } from "./drag-scroll";
 import { isMixed, KIND_ICONS } from "./kind-icon";
 import { Poster } from "./poster";
 
@@ -26,9 +27,11 @@ export function useRailScroll() {
     node.addEventListener("scroll", update, { passive: true });
     const ro = new ResizeObserver(update);
     ro.observe(node);
+    const detachDrag = attachDragScroll(node);
     return () => {
       node.removeEventListener("scroll", update);
       ro.disconnect();
+      detachDrag();
     };
   }, []);
   const by = (dir: 1 | -1) => el.current?.scrollBy({ left: dir * el.current.clientWidth * 0.85, behavior: "smooth" });

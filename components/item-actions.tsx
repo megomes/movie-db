@@ -193,6 +193,34 @@ export function DoneButton({ itemId, kind }: { itemId: string; kind: Kind }) {
   );
 }
 
+const DONE_PAST: Record<Kind, string> = { movie: "Visto", series: "Vista", game: "Zerado", book: "Lido" };
+const doneDay = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "short", year: "numeric" });
+
+// Item já visto (aberto pelo histórico): mostra quando e permite voltar pro backlog
+export function DoneBadge({ itemId, kind, doneAt }: { itemId: string; kind: Kind; doneAt: string }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  return (
+    <>
+      <span className="flex h-12 items-center gap-2 rounded-full bg-success/15 px-5 text-[15px] font-semibold text-success ring-1 ring-success/30">
+        <Check size={18} strokeWidth={3} /> {DONE_PAST[kind]} em {doneDay.format(new Date(doneAt))}
+      </span>
+      <button
+        onClick={() =>
+          start(async () => {
+            await undoDone(itemId);
+            router.refresh();
+          })
+        }
+        disabled={pending}
+        className="glass lift group flex h-12 items-center gap-2 rounded-full px-5 text-[15px] font-medium"
+      >
+        {pending ? <Loader2 size={17} className="animate-spin" /> : <RefreshCw size={17} className="transition-transform duration-500 group-hover:-rotate-180" />} Voltar pro backlog
+      </button>
+    </>
+  );
+}
+
 // "Quero muito": coração com pulo e partículas
 export function PinButton({ itemId, initial }: { itemId: string; initial: boolean }) {
   const [on, setOn] = useState(initial);

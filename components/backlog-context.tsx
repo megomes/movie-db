@@ -14,6 +14,7 @@ type Ctx = {
   reviewCount: number;
   tags: TagLite[];
   shared: Shared[];
+  doneCount: number;
   tagsFor: (kind: Kind) => TagLite[];
   tagName: (id: string) => string | undefined;
   drawOpen: boolean;
@@ -34,10 +35,12 @@ export function BacklogProvider({
   reviewCount,
   tags,
   shared,
+  doneCount,
 }: {
   children: React.ReactNode;
   tags: TagLite[];
   shared: Shared[];
+  doneCount: number;
   items: LiteItem[];
   me: Viewer;
   people: Person[];
@@ -74,6 +77,7 @@ export function BacklogProvider({
       reviewCount,
       tags,
       shared,
+      doneCount,
       tagsFor: (kind: Kind) => tags.filter((t) => t.kind === kind),
       tagName: (id: string) => byId.get(id),
       drawOpen,
@@ -82,7 +86,7 @@ export function BacklogProvider({
       setSearchOpen,
       setAmbient,
     };
-  }, [items, me, people, myProviders, reviewCount, tags, shared, drawOpen, searchOpen, setAmbient]);
+  }, [items, me, people, myProviders, reviewCount, tags, shared, doneCount, drawOpen, searchOpen, setAmbient]);
   return <BacklogContext.Provider value={value}>{children}</BacklogContext.Provider>;
 }
 

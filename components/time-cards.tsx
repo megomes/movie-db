@@ -10,6 +10,7 @@ import { ptGenre } from "@/lib/genres";
 import { accessFor, formatMinutes, KIND_META, scoreLabel } from "@/lib/kinds";
 import type { LiteItem } from "@/lib/queries";
 import { useBacklog } from "./backlog-context";
+import { useDragScroll } from "./drag-scroll";
 import { GUTTER } from "./rail";
 
 export type TimeBucket = { id: string; label: string; hint: string; icon: "film" | "moon" | "game" | "book"; items: LiteItem[] };
@@ -18,6 +19,7 @@ const ICONS = { film: Clapperboard, moon: Moon, game: Gamepad2, book: BookOpen }
 
 // "Quanto tempo você tem?": um cartão por faixa de tempo, cada um sugere algo que cabe
 export function TimeCards({ buckets }: { buckets: TimeBucket[] }) {
+  const drag = useDragScroll<HTMLDivElement>();
   const visible = buckets.filter((b) => b.items.length);
   if (!visible.length) return null;
   return (
@@ -26,7 +28,7 @@ export function TimeCards({ buckets }: { buckets: TimeBucket[] }) {
         <h2 className="text-[22px] font-bold tracking-tight lg:text-[28px]">Quanto tempo você tem?</h2>
         <p className="mt-0.5 text-[13px] text-text-2">Uma sugestão que cabe no seu tempo. Não curtiu? Embaralha.</p>
       </div>
-      <div className={`no-scrollbar flex snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-hidden pb-2 lg:grid lg:grid-cols-4 lg:gap-5 lg:overflow-visible ${GUTTER}`}>
+      <div ref={drag} className={`no-scrollbar flex snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-hidden pb-2 lg:grid lg:grid-cols-4 lg:gap-5 lg:overflow-visible ${GUTTER}`}>
         {visible.map((b) => (
           <Card key={b.id} bucket={b} />
         ))}

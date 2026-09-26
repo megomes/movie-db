@@ -13,6 +13,21 @@ export async function listItems(ownerId: string) {
     .orderBy(desc(items.createdAt));
 }
 
+export async function countDone(ownerId: string) {
+  const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(items).where(and(eq(items.ownerId, ownerId), isNotNull(items.doneAt)));
+  return row?.n ?? 0;
+}
+
+// Histórico: o que a pessoa já viu/jogou/leu, mais recente primeiro
+export async function listDone(ownerId: string) {
+  const rows = await db
+    .select()
+    .from(items)
+    .where(and(eq(items.ownerId, ownerId), isNotNull(items.doneAt)))
+    .orderBy(desc(items.doneAt));
+  return rows.map(toLite);
+}
+
 export async function getItem(id: string) {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
   const [row] = await db.select().from(items).where(eq(items.id, id));
@@ -98,6 +113,7 @@ export function toLite(i: Item) {
     tagIds: i.tagIds,
     matchStatus: i.matchStatus,
     createdAt: i.createdAt.toISOString(),
+    doneAt: i.doneAt?.toISOString() ?? null,
   };
 }
 

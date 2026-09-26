@@ -3,10 +3,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import { AnimatePresence, motion, useMotionValueEvent, useScroll } from "motion/react";
-import { BookOpen, Clapperboard, Dices, Eye, Gamepad2, HeartHandshake, House, LayoutGrid, ListChecks, LogOut, Plus, Search, Settings2, Tv, Users } from "lucide-react";
+import { BookOpen, CircleCheckBig, Clapperboard, Dices, Eye, Gamepad2, HeartHandshake, House, LayoutGrid, ListChecks, LogOut, Plus, Search, Settings2, Tv, Users } from "lucide-react";
 import { authClient } from "@/lib/auth/client";
+import { AddFab, AddPill } from "./add-button";
 import { useBacklog } from "./backlog-context";
 import { DrawOverlay } from "./draw-overlay";
 import { PeopleSwitch } from "./people-switch";
@@ -114,14 +115,12 @@ function TopBar() {
           {items.length > 0 && (
             <button
               onClick={() => setDrawOpen(true)}
-              className="btn-accent group tap flex h-10 items-center gap-2 rounded-full px-4 text-[14px] font-semibold"
+              className="group tap flex h-10 items-center gap-2 rounded-full bg-white/[0.06] px-3.5 text-[14px] font-medium text-white/80 hover:bg-white/10 hover:text-white"
             >
-              <Dices size={18} className="transition-transform duration-500 group-hover:rotate-[200deg]" /> Sortear
+              <Dices size={18} className="transition-transform duration-500 group-hover:rotate-[200deg]" /> <span className="hidden xl:inline">Sortear</span>
             </button>
           )}
-          <Link href="/adicionar" className="tap flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.06] hover:bg-white/10" aria-label="Adicionar">
-            <Plus size={19} />
-          </Link>
+          <AddPill />
           <AvatarMenu />
         </div>
       </div>
@@ -131,7 +130,7 @@ function TopBar() {
 
 function AvatarMenu() {
   const router = useRouter();
-  const { me, people, reviewCount } = useBacklog();
+  const { me, people, reviewCount, doneCount } = useBacklog();
   const [open, setOpen] = useState(false);
   const others = people.filter((p) => p.userId !== me.id);
   const row = "flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] hover:bg-white/10";
@@ -166,8 +165,12 @@ function AvatarMenu() {
                   <Users size={17} className="text-text-2" /> Backlog de {p.name?.split(" ")[0] ?? p.email}
                 </Link>
               ))}
+              <Link href="/vistos" className={row}>
+                <CircleCheckBig size={17} className="text-text-2" /> Vistos
+                {doneCount > 0 && <span className="ml-auto text-[12px] text-text-2">{doneCount}</span>}
+              </Link>
               <Link href="/ajustes" className={row}>
-                <Settings2 size={17} className="text-text-2" /> Perfil e streamings
+                <Settings2 size={17} className="text-text-2" /> Configurações
               </Link>
               <button
                 className={`${row} w-full text-left`}
@@ -199,24 +202,28 @@ const NAV: { href: string; kind?: string; label: string; icon: typeof House; mat
 function Dock() {
   const pathname = usePathname();
   const k = useSearchParams().get("k");
-  const { hidden } = useScrolled();
   const { me, reviewCount } = useBacklog();
   const withItems = useKindsWithItems();
   const [menu, setMenu] = useState(false);
-  const menuActive = ["/ajustes", "/revisar", ...(withItems(NAV).length < NAV.length ? [] : ["/adicionar"])].some((p) => pathname.startsWith(p)) || pathname.startsWith("/pessoa");
+  const menuActive = ["/ajustes", "/revisar", "/juntos", "/vistos", "/pessoa"].some((p) => pathname.startsWith(p));
 
   return (
     <>
-      <motion.nav
-        animate={{ y: hidden ? 120 : 0 }}
-        transition={{ type: "spring", stiffness: 380, damping: 36 }}
+      <nav
         className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-center px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] lg:hidden"
       >
         <ul className="glass-nav flex w-full max-w-md items-center rounded-full p-1">
-          {withItems(NAV).map(({ href, label, icon: Icon, match }) => {
+          {withItems(NAV).map(({ href, label, icon: Icon, match }, idx, list) => {
             const active = match(pathname, k);
             return (
-              <li key={href} className="flex-1">
+              <Fragment key={href}>
+                {/* Adicionar no meio da doca, flutuando */}
+                {idx === Math.ceil(list.length / 2) && (
+                  <li className="flex flex-1 justify-center">
+                    <AddFab active={pathname === "/adicionar"} />
+                  </li>
+                )}
+              <li className="flex-1">
                 <Link
                   href={href}
                   aria-label={label}
@@ -233,21 +240,12 @@ function Dock() {
                   <Icon size={21} strokeWidth={active ? 2.3 : 1.8} className={`relative transition-colors ${active ? "text-white" : "text-white/60"}`} />
                 </Link>
               </li>
+              </Fragment>
             );
           })}
-          <li className="flex-1">
-            <Link href="/juntos" aria-label="Juntos" className="relative flex h-12 w-full items-center justify-center rounded-full">
-              {pathname === "/juntos" && <motion.span layoutId="dock-blob" className="btn-accent absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 32 }} />}
-              <HeartHandshake size={21} strokeWidth={pathname === "/juntos" ? 2.3 : 1.8} className={`relative transition-colors ${pathname === "/juntos" ? "text-white" : "text-white/60"}`} />
-            </Link>
-          </li>
-          {/* Sobrou espaço (poucos tipos no backlog): atalho pra adicionar */}
-          {withItems(NAV).length < NAV.length && (
-            <li className="flex-1">
-              <Link href="/adicionar" aria-label="Adicionar" className="relative flex h-12 w-full items-center justify-center rounded-full">
-                {pathname === "/adicionar" && <motion.span layoutId="dock-blob" className="btn-accent absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 32 }} />}
-                <Plus size={22} strokeWidth={2.2} className={`relative ${pathname === "/adicionar" ? "text-white" : "text-white/60"}`} />
-              </Link>
+          {withItems(NAV).length < 2 && (
+            <li className="flex flex-1 justify-center">
+              <AddFab active={pathname === "/adicionar"} />
             </li>
           )}
           <li className="mx-1 h-6 w-px bg-white/15" />
@@ -261,7 +259,7 @@ function Dock() {
           </li>
         </ul>
 
-      </motion.nav>
+      </nav>
       <MobileMenu open={menu} onClose={() => setMenu(false)} />
     </>
   );
@@ -269,7 +267,7 @@ function Dock() {
 
 function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
-  const { me, items, shared, reviewCount, setSearchOpen, setDrawOpen } = useBacklog();
+  const { me, items, shared, reviewCount, doneCount, setSearchOpen, setDrawOpen } = useBacklog();
   const row = "flex items-center gap-4 rounded-2xl px-3 py-3 text-[16px] active:bg-white/10";
   const icon = "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.07]";
   return (
@@ -345,11 +343,18 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
                 <span className="flex-1">Tudo</span>
               </Link>
             )}
+            <Link href="/vistos" className={row}>
+              <span className={icon}>
+                <CircleCheckBig size={19} />
+              </span>
+              <span className="flex-1">Vistos</span>
+              {doneCount > 0 && <span className="text-[13px] text-white/45">{doneCount}</span>}
+            </Link>
             <Link href="/ajustes" className={row}>
               <span className={icon}>
                 <Settings2 size={19} />
               </span>
-              <span className="flex-1">Perfil, tags e streamings</span>
+              <span className="flex-1">Configurações</span>
             </Link>
             <button
               data-close

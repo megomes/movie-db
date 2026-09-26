@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarDays, ChevronLeft, Clock, ExternalLink, FileText, Gamepad2, Star, Tag, Trophy } from "lucide-react";
 import { Cover } from "@/components/cover";
-import { AmbientColor, CopyButton, DoneButton, ItemMenu, ItemTags, NotesEditor, PinButton } from "@/components/item-actions";
+import { AmbientColor, CopyButton, DoneBadge, DoneButton, ItemMenu, ItemTags, NotesEditor, PinButton } from "@/components/item-actions";
 import { Gallery, TrailerButton } from "@/components/media-gallery";
 import { displayGenres } from "@/lib/genres";
 import type { Availability, CastMember, Item, Provider } from "@/lib/db/schema";
@@ -169,7 +169,7 @@ export default async function ItemPage({ params }: PageProps<"/item/[id]">) {
               <div className="mt-5 flex flex-wrap items-center gap-2.5">
                 {mine ? (
                   <>
-                    <DoneButton itemId={item.id} kind={item.kind} />
+                    {item.doneAt ? <DoneBadge itemId={item.id} kind={item.kind} doneAt={item.doneAt.toISOString()} /> : <DoneButton itemId={item.id} kind={item.kind} />}
                     {item.trailer && <TrailerButton videoId={item.trailer} title={item.title} />}
                     <PinButton itemId={item.id} initial={item.pinned} />
                     <ItemMenu itemId={item.id} />

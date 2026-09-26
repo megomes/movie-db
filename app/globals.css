@@ -351,6 +351,99 @@ body {
   }
 }
 
+/* Botão de adicionar: miolo azul + borda em degradê (cores dos tipos) girando */
+@property --ring {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes ring-spin {
+  to {
+    --ring: 360deg;
+  }
+}
+.add-glow {
+  color: #fff;
+  background:
+    linear-gradient(180deg, #4a8dff, #2f7bff 55%, #1f66e6) padding-box,
+    conic-gradient(from var(--ring), #7cc4ff, #67d87a, #ffd166, #ff8fab, #b18cff, #7cc4ff) border-box;
+  border: 2px solid transparent;
+  box-shadow: 0 8px 28px rgb(47 123 255 / 0.45);
+  animation: ring-spin 4s linear infinite;
+}
+.add-fab {
+  box-shadow:
+    0 10px 30px rgb(47 123 255 / 0.55),
+    0 0 0 6px rgb(6 8 13 / 0.9);
+}
+/* Caça-níquel: + -> filme -> série -> jogo -> livro (cada passo = 1/5 do rolo) */
+@keyframes slot {
+  0%,
+  10% {
+    translate: 0 0;
+  }
+  18%,
+  28% {
+    translate: 0 -20%;
+  }
+  36%,
+  46% {
+    translate: 0 -40%;
+  }
+  54%,
+  64% {
+    translate: 0 -60%;
+  }
+  72%,
+  82% {
+    translate: 0 -80%;
+  }
+  92%,
+  100% {
+    translate: 0 0;
+  }
+}
+/* Parado no + a maior parte do tempo; de vez em quando gira rapidinho */
+@keyframes slot-idle {
+  0%,
+  62% {
+    translate: 0 0;
+  }
+  67%,
+  71% {
+    translate: 0 -20%;
+  }
+  76%,
+  80% {
+    translate: 0 -40%;
+  }
+  85%,
+  89% {
+    translate: 0 -60%;
+  }
+  94%,
+  97% {
+    translate: 0 -80%;
+  }
+  100% {
+    translate: 0 0;
+  }
+}
+.slot-idle {
+  animation: slot-idle 7s var(--ease-out) 1.5s infinite;
+}
+.add-fab-on {
+  box-shadow:
+    0 10px 30px rgb(47 123 255 / 0.55),
+    0 0 0 4px rgb(6 8 13 / 0.9),
+    0 0 0 6px rgb(255 255 255 / 0.6);
+}
+@media (hover: hover) {
+  .group:hover .slot-hover {
+    animation: slot 2.4s var(--ease-out) infinite;
+  }
+}
+
 /* Morph da capa entre lista e detalhe (React ViewTransition) */
 ::view-transition-group(.morph) {
   animation-duration: 420ms;
@@ -370,6 +463,9 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .add-glow,
+  .slot-idle,
+  .slot-hover,
   .spark,
   .wall-col,
   .heartbeat,

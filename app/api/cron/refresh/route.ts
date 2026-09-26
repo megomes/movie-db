@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, isNull, lt } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { db, items, profiles, type Availability, type Item } from "@/lib/db";
 import { computeScore } from "@/lib/enrich";
 import { notifyUser, type PushPayload } from "@/lib/push";
@@ -17,8 +17,7 @@ export async function GET(req: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  // "Visto" há mais de 1 dia some de vez
-  const purged = await db.delete(items).where(lt(items.doneAt, new Date(Date.now() - 86_400_000))).returning({ id: items.id });
+  // Itens "vistos" não são mais apagados: ficam no histórico (/vistos)
 
   const people = await db.select().from(profiles);
   const news = new Map<string, { item: Item; text: string }[]>();
@@ -84,5 +83,5 @@ export async function GET(req: Request) {
     sent += (await notifyUser(userId, payload)).sent;
   }
 
-  return Response.json({ purged: purged.length, avUpdated, gamesUpdated, notifications: sent });
+  return Response.json({ avUpdated, gamesUpdated, notifications: sent });
 }

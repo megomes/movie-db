@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Dices, Heart, Info } from "lucide-react";
+import { Dices, Heart, HeartHandshake, Info } from "lucide-react";
 import { togglePin } from "@/app/actions";
 import { artSrc, coverSrc } from "@/lib/img";
 import { ptGenre } from "@/lib/genres";
@@ -12,14 +12,14 @@ import { accessFor, formatMinutes, KIND_META, scoreLabel } from "@/lib/kinds";
 import type { LiteItem } from "@/lib/queries";
 import { useBacklog } from "./backlog-context";
 import { Cover } from "./cover";
-import { PeopleSwitch } from "./people-switch";
+import { Avatar } from "./people-switch";
 import { GUTTER } from "./rail";
 
 const DURATION = 8000;
 
 // Destaque rotativo da home
 export function Billboard({ featured }: { featured: LiteItem[] }) {
-  const { setAmbient, setDrawOpen, shared } = useBacklog();
+  const { setAmbient, setDrawOpen, shared, me } = useBacklog();
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [spin, setSpin] = useState(0);
@@ -86,11 +86,19 @@ export function Billboard({ featured }: { featured: LiteItem[] }) {
             <h1 className="text-[28px] font-bold leading-tight tracking-tight">Pra hoje ✨</h1>
           </div>
           <div className="flex items-center gap-2">
-            {shared.length > 0 && (
-              <div className="glass rounded-full p-1">
-                <PeopleSwitch align="right" />
-              </div>
-            )}
+            <Link href="/juntos" aria-label="Juntos" className="glass flex h-11 items-center gap-1.5 rounded-full pl-1.5 pr-3.5 text-[14px] font-semibold active:scale-95">
+              {shared.length > 0 ? (
+                <span className="flex -space-x-2">
+                  <Avatar src={me.image} name={me.name} size={26} />
+                  <Avatar src={shared[0].image} name={shared[0].name} size={26} />
+                </span>
+              ) : (
+                <span className="flex h-8 w-8 items-center justify-center">
+                  <HeartHandshake size={18} />
+                </span>
+              )}
+              Juntos
+            </Link>
             <motion.button
               whileTap={{ scale: 0.85 }}
               onClick={() => {
