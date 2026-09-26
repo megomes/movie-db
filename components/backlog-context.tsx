@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import type { LiteItem, Person } from "@/lib/queries";
+import type { Kind } from "@/lib/db/schema";
+import type { LiteItem, Person, Shared, TagLite } from "@/lib/queries";
 
 export type Viewer = { id: string; name: string | null; email: string; image: string | null };
 
@@ -11,6 +12,10 @@ type Ctx = {
   people: Person[];
   myProviders: number[];
   reviewCount: number;
+  tags: TagLite[];
+  shared: Shared[];
+  tagsFor: (kind: Kind) => TagLite[];
+  tagName: (id: string) => string | undefined;
   drawOpen: boolean;
   setDrawOpen: (v: boolean) => void;
   searchOpen: boolean;
@@ -27,8 +32,12 @@ export function BacklogProvider({
   people,
   myProviders,
   reviewCount,
+  tags,
+  shared,
 }: {
   children: React.ReactNode;
+  tags: TagLite[];
+  shared: Shared[];
   items: LiteItem[];
   me: Viewer;
   people: Person[];
@@ -55,10 +64,25 @@ export function BacklogProvider({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const value = useMemo(
-    () => ({ items, me, people, myProviders, reviewCount, drawOpen, setDrawOpen, searchOpen, setSearchOpen, setAmbient }),
-    [items, me, people, myProviders, reviewCount, drawOpen, searchOpen, setAmbient],
-  );
+  const value = useMemo(() => {
+    const byId = new Map(tags.map((t) => [t.id, t.name]));
+    return {
+      items,
+      me,
+      people,
+      myProviders,
+      reviewCount,
+      tags,
+      shared,
+      tagsFor: (kind: Kind) => tags.filter((t) => t.kind === kind),
+      tagName: (id: string) => byId.get(id),
+      drawOpen,
+      setDrawOpen,
+      searchOpen,
+      setSearchOpen,
+      setAmbient,
+    };
+  }, [items, me, people, myProviders, reviewCount, tags, shared, drawOpen, searchOpen, setAmbient]);
   return <BacklogContext.Provider value={value}>{children}</BacklogContext.Provider>;
 }
 

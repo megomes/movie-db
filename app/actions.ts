@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
-import { db, items, profiles, pushSubscriptions, type Kind } from "@/lib/db";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import { db, items, profiles, pushSubscriptions, tags, type Kind } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { enrich, searchCandidates } from "@/lib/enrich";
 import { findByImdbId, searchTmdbMulti } from "@/lib/sources/tmdb";
@@ -76,35 +76,99 @@ export async function searchAction(kind: string, query: string) {
   return results.map(({ externalId, title, year, cover, subtitle }) => ({ externalId, title, year, cover, subtitle, kind: k }));
 }
 
-export async function addItem(kind: string, externalId: string, myPlatforms: string[] = []) {
+// Só aceita tags do próprio usuário e da mesma divisão; devolve também os campos legados sincronizados
+async function validTags(ownerId: string, kind: Kind, tagIds: string[]) {
+  if (!tagIds.length) return { tagIds: [] as string[], names: [] as string[] };
+  const rows = await db
+    .select()
+    .from(tags)
+    .where(and(eq(tags.ownerId, ownerId), eq(tags.kind, kind), inArray(tags.id, tagIds)))
+    .orderBy(tags.position);
+  return { tagIds: rows.map((r) => r.id), names: rows.map((r) => r.name) };
+}
+const legacyFields = (kind: Kind, names: string[]) =>
+  kind === "game" ? { myPlatforms: names } : kind === "book" ? { category: names[0] ?? null } : {};
+
+export async function addItem(kind: string, externalId: string, tagIds: string[] = []) {
   const user = await requireUser();
   const k = assertKind(kind);
-  const data = await enrich(k, externalId);
+  const [data, t] = await Promise.all([enrich(k, externalId), validTags(user.id, k, tagIds)]);
   const [row] = await db
     .insert(items)
-    .values({ title: "", ...data, kind: k, myPlatforms, ownerId: user.id, source: "manual", matchStatus: "matched" })
+    .values({ title: "", ...data, kind: k, ownerId: user.id, source: "manual", matchStatus: "matched", tagIds: t.tagIds, ...legacyFields(k, t.names) })
     .returning({ id: items.id });
   refresh();
   return row.id;
 }
 
-export async function addFromImdb(imdbId: string) {
+// Link do IMDb compartilhado: descobre o tipo antes de perguntar as tags
+export async function resolveImdb(imdbId: string) {
   await requireUser();
   const found = await findByImdbId(imdbId);
-  if (!found) return null;
-  return addItem(found.kind, String(found.id));
+  return found ? { kind: found.kind, externalId: String(found.id) } : null;
+}
+
+export async function setItemTags(itemId: string, tagIds: string[]) {
+  const { user, item } = await own(itemId);
+  const t = await validTags(user.id, item.kind, tagIds);
+  await db.update(items).set({ tagIds: t.tagIds, ...legacyFields(item.kind, t.names) }).where(eq(items.id, itemId));
+  refresh(itemId);
+}
+
+export async function createTag(kind: string, name: string) {
+  const user = await requireUser();
+  const k = assertKind(kind);
+  const clean = name.trim().slice(0, 40);
+  if (!clean) throw new Error("Nome vazio");
+  const [{ max }] = await db
+    .select({ max: sql<number>`coalesce(max(${tags.position}), 0)` })
+    .from(tags)
+    .where(and(eq(tags.ownerId, user.id), eq(tags.kind, k)));
+  const [row] = await db
+    .insert(tags)
+    .values({ ownerId: user.id, kind: k, name: clean, position: Number(max) + 1 })
+    .onConflictDoUpdate({ target: [tags.ownerId, tags.kind, tags.name], set: { name: clean } })
+    .returning({ id: tags.id, kind: tags.kind, name: tags.name, position: tags.position });
+  refresh();
+  return row;
+}
+
+export async function renameTag(tagId: string, name: string) {
+  const user = await requireUser();
+  const clean = name.trim().slice(0, 40);
+  if (!clean) throw new Error("Nome vazio");
+  const [tag] = await db.select().from(tags).where(and(eq(tags.id, tagId), eq(tags.ownerId, user.id)));
+  if (!tag) throw new Error("Tag não encontrada");
+  await db.update(tags).set({ name: clean }).where(eq(tags.id, tagId));
+  // Mantém os campos legados coerentes
+  if (tag.kind === "book") await db.update(items).set({ category: clean }).where(and(eq(items.ownerId, user.id), eq(items.category, tag.name)));
+  if (tag.kind === "game")
+    await db.execute(sql`UPDATE items SET my_platforms = array_replace(my_platforms, ${tag.name}, ${clean}) WHERE owner_id = ${user.id} AND kind = game`);
+  refresh();
+}
+
+export async function deleteTag(tagId: string) {
+  const user = await requireUser();
+  const [tag] = await db.select().from(tags).where(and(eq(tags.id, tagId), eq(tags.ownerId, user.id)));
+  if (!tag) return;
+  await db.execute(sql`UPDATE items SET tag_ids = array_remove(tag_ids, ${tagId}::uuid) WHERE owner_id = ${user.id}`);
+  if (tag.kind === "book") await db.update(items).set({ category: null }).where(and(eq(items.ownerId, user.id), eq(items.category, tag.name)));
+  if (tag.kind === "game") await db.execute(sql`UPDATE items SET my_platforms = array_remove(my_platforms, ${tag.name}) WHERE owner_id = ${user.id} AND kind = game`);
+  await db.delete(tags).where(eq(tags.id, tagId));
+  refresh();
 }
 
 // Traz um item do backlog de outra pessoa para o seu (copia os dados, sem notas)
-export async function copyToMine(itemId: string) {
+export async function copyToMine(itemId: string, tagIds: string[] = []) {
   const user = await requireUser();
   const [src] = await db.select().from(items).where(eq(items.id, itemId));
   if (!src) throw new Error("Item não encontrado");
-  const { id: _id, notes: _n, ownerId: _o, pinned: _p, createdAt: _c, doneAt: _d, source: _s, sourcePath: _sp, ...rest } = src;
-  void [_id, _n, _o, _p, _c, _d, _s, _sp];
+  const { id: _id, notes: _n, ownerId: _o, pinned: _p, createdAt: _c, doneAt: _d, source: _s, sourcePath: _sp, tagIds: _t, ...rest } = src;
+  void [_id, _n, _o, _p, _c, _d, _s, _sp, _t];
+  const t = await validTags(user.id, src.kind, tagIds);
   const [row] = await db
     .insert(items)
-    .values({ ...rest, ownerId: user.id, source: "copy" })
+    .values({ ...rest, ownerId: user.id, source: "copy", tagIds: t.tagIds, ...legacyFields(src.kind, t.names) })
     .returning({ id: items.id });
   refresh();
   return row.id;
@@ -137,12 +201,6 @@ export async function reenrich(itemId: string) {
     .update(items)
     .set({ ...data, creators: data.creators?.length ? data.creators : current.creators })
     .where(eq(items.id, itemId));
-  refresh(itemId);
-}
-
-export async function setMyPlatforms(itemId: string, platforms: string[]) {
-  await own(itemId);
-  await db.update(items).set({ myPlatforms: platforms }).where(eq(items.id, itemId));
   refresh(itemId);
 }
 

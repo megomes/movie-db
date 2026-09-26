@@ -10,6 +10,7 @@ import matter from "gray-matter";
 import { and, eq, inArray } from "drizzle-orm";
 import { db, items, profiles, type Kind, type NewItem } from "../lib/db";
 import { enrich, pickMatch, searchCandidates } from "../lib/enrich";
+import { syncLegacyTags } from "../lib/tags-sync";
 import { findByImdbId } from "../lib/sources/tmdb";
 import { normalize } from "../lib/sources/http";
 
@@ -245,6 +246,7 @@ async function main() {
   fs.writeFileSync("scripts/out/import-report.json", JSON.stringify(report, null, 2));
   const summary = report.reduce<Record<string, number>>((a, r) => ((a[r.status] = (a[r.status] ?? 0) + 1), a), {});
   console.log("Resumo:", summary);
+  await syncLegacyTags(OWNER_ID);
 }
 
 main().catch((e) => {

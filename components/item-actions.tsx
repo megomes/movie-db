@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Check, Heart, Loader2, MoreHorizontal, Plus, RefreshCw, Replace, Trash2 } from "lucide-react";
-import { copyToMine, deleteItem, markDone, reenrich, setMyPlatforms, togglePin, undoDone, updateNotes } from "@/app/actions";
+import { Check, Heart, Loader2, MoreHorizontal, Pencil, Plus, RefreshCw, Replace, Tag, Trash2 } from "lucide-react";
+import { copyToMine, deleteItem, markDone, reenrich, setItemTags, togglePin, undoDone, updateNotes } from "@/app/actions";
 import type { Kind } from "@/lib/db/schema";
-import { useAmbient } from "./backlog-context";
+import { useAmbient, useBacklog } from "./backlog-context";
+import { useTagAsk } from "./tag-picker";
 
 const DONE_LABEL: Record<Kind, string> = { movie: "Já vi", series: "Já vi", game: "Já joguei", book: "Já li" };
 
@@ -160,17 +161,57 @@ export function PinButton({ itemId, initial }: { itemId: string; initial: boolea
   );
 }
 
-export function CopyButton({ itemId }: { itemId: string }) {
+export function CopyButton({ itemId, kind, title, cover }: { itemId: string; kind: Kind; title: string; cover: string | null }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const { ask, picker } = useTagAsk();
   return (
+    <>
+    {picker}
     <button
-      onClick={() => start(async () => router.push(`/item/${await copyToMine(itemId)}`))}
+      onClick={() =>
+        ask({
+          kind,
+          title,
+          cover,
+          confirmLabel: "Trazer pro meu backlog",
+          onConfirm: (tagIds) => new Promise<void>((done) => start(async () => {
+            router.push(`/item/${await copyToMine(itemId, tagIds)}`);
+            done();
+          })),
+        })
+      }
       disabled={pending}
       className="btn-accent flex h-12 flex-1 items-center justify-center gap-2 rounded-full px-7 text-[16px] font-semibold sm:flex-none"
     >
       {pending ? <Loader2 size={18} className="animate-spin" /> : <Plus size={19} />} Quero ver também
     </button>
+    </>
+  );
+}
+
+// Tags do item no topo do detalhe, com botão para trocar
+export function ItemTags({ itemId, kind, title, cover, tagIds, editable }: { itemId: string; kind: Kind; title: string; cover: string | null; tagIds: string[]; editable: boolean }) {
+  const { tagName } = useBacklog();
+  const { ask, picker } = useTagAsk();
+  const names = tagIds.map(tagName).filter(Boolean) as string[];
+  if (!editable && !names.length) return null;
+  const open = () =>
+    ask({ kind, title, cover, initial: tagIds, confirmLabel: "Salvar tags", onConfirm: (ids) => setItemTags(itemId, ids) });
+  return (
+    <>
+      {picker}
+      {names.map((n) => (
+        <span key={n} className="flex items-center gap-1.5 rounded-full bg-accent/20 px-3 py-1 text-[12px] font-semibold text-accent-2 ring-1 ring-accent/40">
+          <Tag size={12} /> {n}
+        </span>
+      ))}
+      {editable && (
+        <button onClick={open} className="glass tap flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium text-white/80 hover:text-white">
+          {names.length ? <Pencil size={12} /> : <Plus size={13} />} {names.length ? "Trocar tags" : "Adicionar tag"}
+        </button>
+      )}
+    </>
   );
 }
 
@@ -261,30 +302,3 @@ export function NotesEditor({ itemId, initial }: { itemId: string; initial: stri
   );
 }
 
-const PLATFORMS = ["PC", "Switch", "PS5", "Xbox"];
-
-export function PlatformToggle({ itemId, current }: { itemId: string; current: string[] }) {
-  const [value, setValue] = useState(current);
-  const [, start] = useTransition();
-  return (
-    <div className="flex flex-wrap gap-2">
-      {PLATFORMS.map((p) => {
-        const on = value.includes(p);
-        return (
-          <button
-            key={p}
-            onClick={() => {
-              const next = on ? value.filter((x) => x !== p) : [...value, p];
-              setValue(next);
-              start(() => setMyPlatforms(itemId, next));
-            }}
-            aria-pressed={on}
-            className={`tap h-9 rounded-full px-4 text-[13px] font-medium transition-colors ${on ? "btn-accent" : "glass text-white/70"}`}
-          >
-            {p}
-          </button>
-        );
-      })}
-    </div>
-  );
-}

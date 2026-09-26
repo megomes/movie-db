@@ -53,8 +53,9 @@ export function Poster({
       }}
     >
       <motion.div
-        style={{ rotateX: rx, rotateY: ry, transformStyle: "preserve-3d" }}
-        className="relative rounded-2xl transition-[scale,box-shadow] duration-300 group-hover:z-10 group-hover:scale-[1.04] group-hover:shadow-[0_18px_50px_rgb(0_0_0/0.6)] group-focus-visible:ring-2 group-focus-visible:ring-accent group-active:scale-[0.97]"
+        // Sem preserve-3d: o cartão inclina como uma peça só (evita as camadas "brigarem" e piscarem)
+        style={{ rotateX: rx, rotateY: ry }}
+        className="relative overflow-hidden rounded-2xl transition-[scale,box-shadow] duration-300 group-hover:z-10 group-hover:scale-[1.04] group-hover:shadow-[0_18px_50px_rgb(0_0_0/0.6)] group-focus-visible:ring-2 group-focus-visible:ring-accent group-active:scale-[0.97]"
       >
         <Cover item={item} size={size} eager={eager} morph={morph} rounded="rounded-2xl" />
 
@@ -75,12 +76,15 @@ export function Poster({
         {access.tier === "mine" && <span className="absolute bottom-2 right-2 h-2.5 w-2.5 rounded-full bg-success ring-2 ring-black/50 group-hover:opacity-0" />}
 
         {/* Infos no hover (desktop) */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 hidden translate-y-2 rounded-b-2xl bg-gradient-to-t from-black/95 via-black/70 to-transparent p-3 pt-10 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 [@media(hover:hover)]:block">
-          <p className="text-[13px] font-semibold leading-tight line-clamp-2">{item.title}</p>
-          <p className="mt-1 text-[11px] text-white/65">{[item.year, length].filter(Boolean).join(" · ")}</p>
-          {item.kind !== "book" && access.tier !== "unknown" && (
-            <p className={`mt-0.5 truncate text-[11px] font-medium ${access.tier === "mine" ? "text-success" : "text-white/80"}`}>{access.label}</p>
-          )}
+        {/* Infos no hover (desktop): degradê cobre o pôster inteiro; só o texto desliza */}
+        <div className="pointer-events-none absolute inset-0 hidden flex-col justify-end bg-[linear-gradient(to_top,rgb(0_0_0/0.96)_0%,rgb(0_0_0/0.82)_32%,rgb(0_0_0/0.35)_62%,transparent_85%)] p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100 [@media(hover:hover)]:flex">
+          <div className="translate-y-2 transition-transform duration-300 group-hover:translate-y-0">
+            <p className="text-[13px] font-semibold leading-tight line-clamp-2">{item.title}</p>
+            <p className="mt-1 text-[11px] text-white/65">{[item.year, length].filter(Boolean).join(" · ")}</p>
+            {item.kind !== "book" && access.tier !== "unknown" && (
+              <p className={`mt-0.5 truncate text-[11px] font-medium ${access.tier === "mine" ? "text-success" : "text-white/80"}`}>{access.label}</p>
+            )}
+          </div>
         </div>
       </motion.div>
     </Link>

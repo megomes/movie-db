@@ -12,15 +12,17 @@ import { accessFor, formatMinutes, KIND_META, scoreLabel } from "@/lib/kinds";
 import type { LiteItem } from "@/lib/queries";
 import { useBacklog } from "./backlog-context";
 import { Cover } from "./cover";
+import { PeopleSwitch } from "./people-switch";
 import { GUTTER } from "./rail";
 
 const DURATION = 8000;
 
 // Destaque rotativo da home
 export function Billboard({ featured }: { featured: LiteItem[] }) {
-  const { setAmbient, setDrawOpen } = useBacklog();
+  const { setAmbient, setDrawOpen, shared } = useBacklog();
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [spin, setSpin] = useState(0);
   const item = featured[index];
 
   useEffect(() => {
@@ -68,10 +70,30 @@ export function Billboard({ featured }: { featured: LiteItem[] }) {
 
       {/* Celular: card de arte arrastável */}
       <div className="px-4 pt-[calc(env(safe-area-inset-top)+14px)] lg:hidden">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="relative z-20 mb-3 flex items-center justify-between">
           <div>
             <p className="text-[13px] font-medium text-text-2">Seu backlog</p>
             <h1 className="text-[28px] font-bold leading-tight tracking-tight">Pra hoje ✨</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            {shared.length > 0 && (
+              <div className="glass rounded-full p-1">
+                <PeopleSwitch align="right" />
+              </div>
+            )}
+            <motion.button
+              whileTap={{ scale: 0.85 }}
+              onClick={() => {
+                setSpin((s) => s + 1);
+                setDrawOpen(true);
+              }}
+              aria-label="Sortear"
+              className="btn-accent flex h-11 w-11 shrink-0 items-center justify-center rounded-full"
+            >
+              <motion.span animate={{ rotate: spin * 360 }} transition={{ type: "spring", stiffness: 120, damping: 14 }}>
+                <Dices size={20} strokeWidth={2.2} />
+              </motion.span>
+            </motion.button>
           </div>
         </div>
         <motion.div

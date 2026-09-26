@@ -1,5 +1,6 @@
 import { AddSearch } from "@/components/add-search";
 import { PageHeader } from "@/components/page-header";
+import { KINDS } from "@/lib/kinds";
 
 export const metadata = { title: "Adicionar" };
 
@@ -19,7 +20,8 @@ export default async function AddPage({ searchParams }: PageProps<"/adicionar">)
       .replace(/\s*[-|–]\s*(IMDb|Letterboxd|Steam|Rotten Tomatoes|Goodreads|Skoob|Amazon.*)\s*$/i, "")
       .replace(/\s*\(\d{4}\)\s*/, " ")
       .trim();
-  const initialKind = steamTitle ? "game" : "any";
+  const k = KINDS.find((x) => x === one(sp.k));
+  const initialKind = steamTitle ? "game" : (k ?? "any");
 
   return (
     <div className="mx-auto max-w-[1400px]">

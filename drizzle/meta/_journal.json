@@ -50,6 +50,13 @@
       "when": 1790385934698,
       "tag": "0006_logo",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790386633879,
+      "tag": "0007_tags",
+      "breakpoints": true
     }
   ]
 }

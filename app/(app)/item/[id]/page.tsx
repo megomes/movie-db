@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CalendarDays, ChevronLeft, Clock, ExternalLink, FileText, Gamepad2, Star, Tag, Trophy } from "lucide-react";
 import { Cover } from "@/components/cover";
-import { AmbientColor, CopyButton, DoneButton, ItemMenu, NotesEditor, PinButton, PlatformToggle } from "@/components/item-actions";
+import { AmbientColor, CopyButton, DoneButton, ItemMenu, ItemTags, NotesEditor, PinButton } from "@/components/item-actions";
 import { Gallery, TrailerButton } from "@/components/media-gallery";
 import { displayGenres } from "@/lib/genres";
 import type { Availability, CastMember, Item, Provider } from "@/lib/db/schema";
@@ -67,7 +67,9 @@ export default async function ItemPage({ params }: PageProps<"/item/[id]">) {
   const stats = statsFor(item);
   const about = item.summary ?? item.overview;
 
-  const genres = displayGenres(item).slice(0, 4);
+  // Categoria do Obsidian agora é tag; aqui ficam só os gêneros das APIs
+  const genres = displayGenres({ ...item, category: null }).slice(0, 4);
+  const coverThumb = coverSrc(item.coverUrl, "sm");
 
   return (
     <article className="relative">
@@ -109,6 +111,7 @@ export default async function ItemPage({ params }: PageProps<"/item/[id]">) {
               {!mine && owner && <p className="mb-2 text-[13px] font-medium text-accent-2">Do backlog de {owner.name?.split(" ")[0]}</p>}
               <div className="flex flex-wrap items-center gap-2">
                 <span className="glass rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]">{KIND_META[item.kind].label}</span>
+                <ItemTags itemId={item.id} kind={item.kind} title={item.title} cover={coverThumb} tagIds={mine ? item.tagIds : []} editable={mine} />
                 {genres.map((g) => (
                   <span key={g} className="glass rounded-full px-3 py-1 text-[12px] text-white/80">
                     {g}
@@ -168,7 +171,7 @@ export default async function ItemPage({ params }: PageProps<"/item/[id]">) {
                   </>
                 ) : (
                   <>
-                    <CopyButton itemId={item.id} />
+                    <CopyButton itemId={item.id} kind={item.kind} title={item.title} cover={coverThumb} />
                     {item.trailer && <TrailerButton videoId={item.trailer} title={item.title} />}
                   </>
                 )}
@@ -199,7 +202,7 @@ export default async function ItemPage({ params }: PageProps<"/item/[id]">) {
             <section>
               <SectionTitle>{item.kind === "game" ? "Onde jogar" : item.kind === "book" ? "Onde encontrar" : "Assistir online"}</SectionTitle>
               {(item.kind === "movie" || item.kind === "series") && <Providers availability={item.availability} myProviders={myProviders} />}
-              {item.kind === "game" && <GameWhere item={item} mine={mine} />}
+              {item.kind === "game" && <GameWhere item={item} />}
               {item.kind === "book" && <BookWhere item={item} />}
             </section>
             {item.cast.length > 0 && <Cast title={item.kind === "book" ? "Autoria" : "Elenco"} people={item.cast} />}
@@ -310,7 +313,7 @@ function LinkPill({ href, children }: { href: string; children: React.ReactNode 
   );
 }
 
-function GameWhere({ item, mine }: { item: Item; mine: boolean }) {
+function GameWhere({ item }: { item: Item }) {
   const p = item.steamPrice;
   return (
     <div className="space-y-5">
@@ -324,12 +327,6 @@ function GameWhere({ item, mine }: { item: Item; mine: boolean }) {
         {item.myPlatforms.includes("Switch") && <LinkPill href={`https://www.nintendo.com/pt-br/search/#q=${encodeURIComponent(item.title)}`}>eShop</LinkPill>}
         {item.gamePass && <span className="inline-flex h-11 items-center rounded-full bg-success/15 px-5 text-[14px] font-medium text-success">Game Pass (nuvem)</span>}
       </div>
-      {mine && (
-        <div>
-          <p className="mb-2.5 text-[12px] font-semibold uppercase tracking-wider text-white/45">Quero jogar no</p>
-          <PlatformToggle itemId={item.id} current={item.myPlatforms} />
-        </div>
-      )}
       {item.platforms.length > 0 && <p className="text-[13px] text-white/45">Lançado para {item.platforms.join(", ")}</p>}
     </div>
   );

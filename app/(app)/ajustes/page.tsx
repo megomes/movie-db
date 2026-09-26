@@ -1,5 +1,6 @@
 import { ProfileHeader } from "@/components/profile-view";
 import { PushManager, ProviderPicker } from "@/components/settings";
+import { TagManager } from "@/components/tag-manager";
 import { listBrProviders } from "@/lib/sources/tmdb";
 import { getProfile, requireUser } from "@/lib/session";
 
@@ -19,6 +20,12 @@ export default async function SettingsPage() {
   return (
     <div className="mx-auto max-w-[1100px] space-y-12 px-4 pb-10 pt-[calc(env(safe-area-inset-top)+20px)] sm:px-6 lg:px-10 lg:pt-28">
       <ProfileHeader />
+
+      <section id="tags" className="scroll-mt-24">
+        <h2 className="text-[22px] font-bold tracking-tight">Tags</h2>
+        <p className="mb-5 mt-1 text-[14px] text-text-2">Suas categorias por divisão (ex.: consoles nos jogos, tipos de livro). Ao adicionar algo, o app sempre pergunta a tag.</p>
+        <TagManager />
+      </section>
 
       <section>
         <h2 className="text-[22px] font-bold tracking-tight">Seus streamings</h2>

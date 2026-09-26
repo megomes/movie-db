@@ -5,11 +5,12 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Check, Loader2, Plus, Search, X } from "lucide-react";
-import { addFromImdb, addItem, searchAction } from "@/app/actions";
+import { addItem, resolveImdb, searchAction } from "@/app/actions";
 import type { Kind } from "@/lib/db/schema";
 import { KIND_META, KINDS } from "@/lib/kinds";
 import { normalize } from "@/lib/sources/http";
 import { useBacklog } from "./backlog-context";
+import { useTagAsk } from "./tag-picker";
 
 type Result = Awaited<ReturnType<typeof searchAction>>[number];
 
@@ -48,34 +49,56 @@ export function AddSearch({ initialQuery, initialKind, imdbId }: { initialQuery:
   const [query, setQuery] = useState(initialQuery);
   const [status, setStatus] = useState<Record<string, "adding" | string>>({});
   const { results, loading, error } = useSearch(kind, query);
+  const { ask, picker } = useTagAsk();
 
   // Marca o que já está no backlog (pelo título + ano)
   const owned = new Set(items.map((i) => `${normalize(i.title)}|${i.year ?? ""}`));
 
-  async function add(r: Result) {
+  // Sempre pergunta a tag quando a divisão tem tags
+  function add(r: Result) {
     const key = `${r.kind}:${r.externalId}`;
-    setStatus((s) => ({ ...s, [key]: "adding" }));
-    try {
-      const id = await addItem(r.kind, r.externalId);
-      setStatus((s) => ({ ...s, [key]: id }));
-      navigator.vibrate?.(12);
-    } catch {
-      setStatus((s) => {
-        const next = { ...s };
-        delete next[key];
-        return next;
-      });
-    }
+    ask({
+      kind: r.kind,
+      title: r.title,
+      cover: r.cover,
+      confirmLabel: "Adicionar ao backlog",
+      onConfirm: async (tagIds) => {
+        setStatus((s) => ({ ...s, [key]: "adding" }));
+        try {
+          const id = await addItem(r.kind, r.externalId, tagIds);
+          setStatus((s) => ({ ...s, [key]: id }));
+          navigator.vibrate?.(12);
+        } catch {
+          setStatus((s) => {
+            const next = { ...s };
+            delete next[key];
+            return next;
+          });
+        }
+      },
+    });
   }
 
   return (
     <div>
+      {picker}
       {imdbId && (
         <button
           onClick={async () => {
             setStatus((s) => ({ ...s, imdb: "adding" }));
-            const id = await addFromImdb(imdbId);
-            if (id) setStatus((s) => ({ ...s, imdb: id }));
+            const found = await resolveImdb(imdbId);
+            if (!found) return setStatus((s) => ({ ...s, imdb: "" }));
+            setStatus((s) => ({ ...s, imdb: "" }));
+            ask({
+              kind: found.kind,
+              title: initialQuery || "Link do IMDb",
+              confirmLabel: "Adicionar ao backlog",
+              onConfirm: async (tagIds) => {
+                setStatus((s) => ({ ...s, imdb: "adding" }));
+                const id = await addItem(found.kind, found.externalId, tagIds);
+                setStatus((s) => ({ ...s, imdb: id }));
+              },
+            });
           }}
           className="btn-accent mb-5 flex h-12 w-full items-center justify-center gap-2 rounded-full font-semibold"
         >

@@ -9,7 +9,7 @@ import { Poster } from "./poster";
 
 export const GUTTER = "px-4 sm:px-6 lg:px-10";
 
-function useRailScroll() {
+export function useRailScroll() {
   const ref = useRef<HTMLDivElement>(null);
   const by = (dir: 1 | -1) => ref.current?.scrollBy({ left: dir * ref.current.clientWidth * 0.85, behavior: "smooth" });
   return { ref, by };
@@ -31,7 +31,7 @@ function RailHeader({ title, subtitle, href }: { title: string; subtitle?: strin
   );
 }
 
-function Arrows({ by }: { by: (d: 1 | -1) => void }) {
+export function Arrows({ by }: { by: (d: 1 | -1) => void }) {
   const cls =
     "glass absolute top-1/2 z-20 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full opacity-0 transition-opacity duration-200 group-hover/rail:opacity-100 lg:flex";
   return (

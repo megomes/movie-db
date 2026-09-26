@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowDownAZ, Check, ChevronDown, ChevronRight, Clock, Search, Shuffle, Sparkles, Star, X } from "lucide-react";
@@ -9,10 +9,11 @@ import type { Kind } from "@/lib/db/schema";
 import { normalize } from "@/lib/sources/http";
 import { ptGenre } from "@/lib/genres";
 import { accessFor, KIND_META, KINDS } from "@/lib/kinds";
-import type { LiteItem } from "@/lib/queries";
+import type { LiteItem, TagLite } from "@/lib/queries";
 import { useBacklog } from "./backlog-context";
 import { Poster } from "./poster";
 import { GUTTER } from "./rail";
+import { TagNudge } from "./tag-nudge";
 
 const SORTS = [
   { id: "score", label: "Maior nota", hint: "Os mais bem avaliados primeiro", icon: Star },
@@ -25,103 +26,86 @@ type SortId = (typeof SORTS)[number]["id"];
 
 const TITLES: Record<Kind | "all", string> = { all: "Tudo", movie: "Filmes", series: "Séries", game: "Jogos", book: "Livros" };
 
-// Tags de cada divisão, a partir dos dados enriquecidos (e das categorias do Obsidian nos livros)
-type TagGroup = { id: string; label: string; tags: { value: string; count: number }[] };
+// Filtros de cada divisão: suas tags (gerenciadas no Perfil) + gêneros das APIs
+type TagOption = { value: string; label: string; count: number };
+type TagGroup = { id: "tag" | "genre"; label: string; tags: TagOption[] };
 const genresOf = (i: LiteItem) => [...new Set(i.genres.map(ptGenre))];
-const platformsOf = (i: LiteItem) => (i.myPlatforms.length ? i.myPlatforms : ["Sem console"]);
-const categoryOf = (i: LiteItem) => i.category ?? "Sem categoria";
 
-function countTags(items: LiteItem[], pick: (i: LiteItem) => string[], limit = 14) {
+function countBy(items: LiteItem[], pick: (i: LiteItem) => string[], label: (v: string) => string, limit = 14): TagOption[] {
   const m = new Map<string, number>();
   for (const i of items) for (const t of pick(i)) m.set(t, (m.get(t) ?? 0) + 1);
   return [...m.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
-    .map(([value, count]) => ({ value, count }));
-}
-
-function tagGroupsFor(kind: Kind | "all", items: LiteItem[]): TagGroup[] {
-  switch (kind) {
-    case "book":
-      return [{ id: "category", label: "Categoria", tags: countTags(items, (i) => [categoryOf(i)]) }];
-    case "game":
-      return [
-        { id: "platform", label: "Console", tags: countTags(items, platformsOf) },
-        { id: "genre", label: "Gênero", tags: countTags(items, genresOf, 10) },
-      ];
-    case "movie":
-    case "series":
-      return [{ id: "genre", label: "Gênero", tags: countTags(items, genresOf, 12) }];
-    default:
-      return [];
-  }
-}
-
-const matchesTag = (i: LiteItem, group: string, value: string) =>
-  group === "category" ? categoryOf(i) === value : group === "platform" ? platformsOf(i).includes(value) : genresOf(i).includes(value);
-
-// Agrupamento da grade: Tudo → por divisão; Livros → por categoria; Jogos → por console
-function groupFor(kind: Kind | "all", list: LiteItem[]): { key: string; title: string; href?: string; items: LiteItem[] }[] {
-  if (kind === "all")
-    return KINDS.map((k) => ({ key: k, title: KIND_META[k].plural, href: `/lista?k=${k}`, items: list.filter((i) => i.kind === k) })).filter((g) => g.items.length);
-  const by = (key: (i: LiteItem) => string) => {
-    const m = new Map<string, LiteItem[]>();
-    for (const i of list) m.set(key(i), [...(m.get(key(i)) ?? []), i]);
-    return [...m.entries()].sort((a, b) => b[1].length - a[1].length).map(([k, items]) => ({ key: k, title: k, items }));
-  };
-  if (kind === "book") return by(categoryOf);
-  // Jogo em mais de um console fica num grupo próprio ("PC + Switch"), sem repetir
-  if (kind === "game") return by((i) => (i.myPlatforms.length ? [...i.myPlatforms].sort().join(" + ") : "Sem console"));
-  return [{ key: "all", title: "", items: list }];
+    .map(([value, count]) => ({ value, label: label(value), count }));
 }
 
 export function ListBrowser({
   items: external,
+  tags: externalTags,
   owner,
   mode = "page",
   noMorphIds,
 }: {
   items?: LiteItem[];
+  tags?: TagLite[];
   owner?: { name: string | null };
   mode?: "page" | "home";
   noMorphIds?: Set<string>;
 }) {
   const ctx = useBacklog();
   const items = external ?? ctx.items;
+  const tagList = externalTags ?? ctx.tags;
   const readOnly = !!external;
   const sp = useSearchParams();
+  const pathname = usePathname();
+  // Na página de outra pessoa os links ficam nela; no resto, vão para a Lista
+  const base = readOnly ? pathname : "/lista";
+  const goKind = (k: Kind | "all") => {
+    window.history.pushState(null, "", k === "all" ? base : `${base}?k=${k}`);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const kindParam = mode === "home" ? null : sp.get("k");
   const kind: Kind | "all" = KINDS.includes(kindParam as Kind) ? (kindParam as Kind) : "all";
   const [sort, setSort] = useState<SortId>(SORTS.some((s) => s.id === sp.get("sort")) ? (sp.get("sort") as SortId) : "score");
-  const [tags, setTags] = useState<Record<string, string | null>>((): Record<string, string | null> => {
-    const f = sp.get("f");
-    return f === "switch" ? { platform: "Switch" } : f === "pc" ? { platform: "PC" } : {};
-  });
+  const [filter, setFilter] = useState<{ tag: string | null; genre: string | null }>({ tag: null, genre: null });
   const [onlyPinned, setOnlyPinned] = useState(false);
   const [onlyMine, setOnlyMine] = useState(sp.get("f") === "mine");
   const [onlySale, setOnlySale] = useState(sp.get("f") === "sale");
   const [q, setQ] = useState("");
   const [seed, setSeed] = useState(1);
 
-  // Troca de divisão zera as tags (via key no componente pai seria mais caro)
+  // Troca de divisão zera os filtros
   const [lastKind, setLastKind] = useState(kind);
   if (lastKind !== kind) {
     setLastKind(kind);
-    setTags({});
+    setFilter({ tag: null, genre: null });
   }
 
+  const tagMeta = useMemo(() => new Map(tagList.map((t) => [t.id, t])), [tagList]);
   const ofKind = useMemo(() => (kind === "all" ? items : items.filter((i) => i.kind === kind)), [items, kind]);
-  const groups = useMemo(() => tagGroupsFor(kind, ofKind), [kind, ofKind]);
+
+  const groups = useMemo((): TagGroup[] => {
+    if (kind === "all") return [];
+    const out: TagGroup[] = [];
+    const tagOpts = countBy(ofKind, (i) => i.tagIds.filter((t) => tagMeta.has(t)), (v) => tagMeta.get(v)?.name ?? v, 20).sort(
+      (a, b) => (tagMeta.get(a.value)?.position ?? 0) - (tagMeta.get(b.value)?.position ?? 0),
+    );
+    if (tagOpts.length) out.push({ id: "tag", label: "Tags", tags: tagOpts });
+    if (kind !== "book") out.push({ id: "genre", label: "Gênero", tags: countBy(ofKind, genresOf, (v) => v, 12) });
+    return out;
+  }, [kind, ofKind, tagMeta]);
 
   const visible = useMemo(() => {
     const nq = normalize(q);
     let list = ofKind.filter((i) => {
-      if (nq && !normalize([i.title, ...i.creators, ...i.genres, i.category ?? ""].join(" ")).includes(nq)) return false;
+      if (nq && !normalize([i.title, ...i.creators, ...i.genres, ...i.tagIds.map((t) => tagMeta.get(t)?.name ?? "")].join(" ")).includes(nq)) return false;
       if (onlyPinned && !i.pinned) return false;
       if (onlyMine && accessFor(i, ctx.myProviders).tier !== "mine") return false;
       if (onlySale && !(i.steamPrice?.discountPercent ?? 0)) return false;
-      for (const [g, v] of Object.entries(tags)) if (v && !matchesTag(i, g, v)) return false;
+      if (filter.tag && !i.tagIds.includes(filter.tag)) return false;
+      if (filter.genre && !genresOf(i).includes(filter.genre)) return false;
       return true;
     });
     const len = (i: LiteItem) => (i.kind === "book" ? (i.pages ?? 9999) * 1.2 : (i.minutes ?? 99999));
@@ -136,10 +120,28 @@ export function ListBrowser({
     };
     list = [...list].sort(cmp[sort]);
     return list;
-  }, [ofKind, q, tags, onlyPinned, onlyMine, onlySale, sort, ctx.myProviders, seed]);
+  }, [ofKind, q, filter, onlyPinned, onlyMine, onlySale, sort, ctx.myProviders, seed, tagMeta]);
 
-  const filtering = !!q || Object.values(tags).some(Boolean) || onlyPinned || onlyMine || onlySale;
-  const sections = filtering ? [{ key: "all", title: "", items: visible }] : groupFor(kind, visible);
+  // Agrupamento: Tudo → por divisão; divisão com tags → pela combinação de tags (sem repetir itens)
+  const sections = useMemo(() => {
+    const filtering = !!q || !!filter.tag || !!filter.genre || onlyPinned || onlyMine || onlySale;
+    if (filtering) return [{ key: "all", title: "", href: undefined as string | undefined, items: visible }];
+    if (kind === "all")
+      return KINDS.map((k) => ({ key: k, title: KIND_META[k].plural, href: `${base}?k=${k}` as string | undefined, items: visible.filter((i) => i.kind === k) })).filter(
+        (g) => g.items.length,
+      );
+    if (!tagList.some((t) => t.kind === kind)) return [{ key: "all", title: "", href: undefined, items: visible }];
+    const keyOf = (i: LiteItem) => {
+      const names = i.tagIds.map((t) => tagMeta.get(t)).filter(Boolean).sort((a, b) => a!.position - b!.position).map((t) => t!.name);
+      return names.length ? names.join(" + ") : "Sem tag";
+    };
+    const m = new Map<string, LiteItem[]>();
+    for (const i of visible) m.set(keyOf(i), [...(m.get(keyOf(i)) ?? []), i]);
+    return [...m.entries()]
+      .sort((a, b) => (a[0] === "Sem tag" ? 1 : b[0] === "Sem tag" ? -1 : b[1].length - a[1].length))
+      .map(([k, items]) => ({ key: k, title: k, href: undefined, items }));
+  }, [visible, kind, q, filter, onlyPinned, onlyMine, onlySale, tagList, tagMeta, base]);
+
   const quick = [
     { on: onlyPinned, set: setOnlyPinned, label: "♥ Quero muito", show: true },
     { on: onlyMine, set: setOnlyMine, label: "No meu streaming", show: !readOnly && (kind === "all" || kind === "movie" || kind === "series") },
@@ -170,6 +172,25 @@ export function ListBrowser({
         </div>
       </header>
 
+      {!readOnly && !home && kind !== "all" && (
+        <div className={GUTTER}>
+          <TagNudge key={kind} kind={kind} count={ofKind.length} />
+        </div>
+      )}
+
+      {readOnly && (
+        <div className={`mt-4 ${GUTTER}`}>
+          <div className="glass no-scrollbar inline-flex max-w-full gap-1 overflow-x-auto rounded-full p-1">
+            {(["all", ...KINDS] as const).map((k) => (
+              <button key={k} onClick={() => goKind(k)} className="relative shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium">
+                {kind === k && <motion.span layoutId="ro-kind" className="btn-accent absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
+                <span className={`relative ${kind === k ? "text-white" : "text-white/70"}`}>{k === "all" ? "Tudo" : KIND_META[k].plural}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Busca, filtros rápidos e tags da divisão */}
       <div className={`sticky z-30 mt-4 space-y-2.5 py-3 ${home ? "top-0 lg:top-20" : "top-0 lg:top-20"}`}>
         <div className={`flex flex-col gap-2.5 sm:flex-row sm:items-center ${GUTTER}`}>
@@ -194,10 +215,10 @@ export function ListBrowser({
           <div key={g.id} className={`no-scrollbar flex items-center gap-2 overflow-x-auto ${GUTTER}`}>
             <span className="shrink-0 pr-1 text-[11px] font-semibold uppercase tracking-wider text-white/40">{g.label}</span>
             {g.tags.map((t) => {
-              const on = tags[g.id] === t.value;
+              const on = filter[g.id] === t.value;
               return (
-                <TagChip key={t.value} on={on} onClick={() => setTags((s) => ({ ...s, [g.id]: on ? null : t.value }))}>
-                  {t.value} <span className="opacity-55">{t.count}</span>
+                <TagChip key={t.value} on={on} onClick={() => setFilter((s) => ({ ...s, [g.id]: on ? null : t.value }))}>
+                  {t.label} <span className="opacity-55">{t.count}</span>
                 </TagChip>
               );
             })}
@@ -219,8 +240,7 @@ export function ListBrowser({
                     onClick={(e) => {
                       if (home) return;
                       e.preventDefault();
-                      window.history.pushState(null, "", s.href);
-                      window.scrollTo({ top: 0, behavior: "smooth" });
+                      goKind(s.key as Kind);
                     }}
                     className="group flex items-center gap-0.5 text-[13px] font-medium text-text-2 hover:text-white"
                   >

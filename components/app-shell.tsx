@@ -5,19 +5,26 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
 import { AnimatePresence, motion, useMotionValueEvent, useScroll } from "motion/react";
-import { Dices, House, LayoutGrid, ListChecks, LogOut, Plus, Search, Settings2, Users } from "lucide-react";
+import { BookOpen, Clapperboard, Dices, Eye, Gamepad2, HeartHandshake, House, LayoutGrid, ListChecks, LogOut, Plus, Search, Settings2, Tv, Users } from "lucide-react";
 import { authClient } from "@/lib/auth/client";
 import { useBacklog } from "./backlog-context";
 import { DrawOverlay } from "./draw-overlay";
+import { PeopleSwitch } from "./people-switch";
 import { SearchPalette } from "./search-palette";
 
-const SECTIONS = [
+// Só mostra na navegação os tipos que têm algo no backlog
+function useKindsWithItems() {
+  const { items } = useBacklog();
+  const kinds = new Set<string>(items.map((i) => i.kind));
+  return <T extends { kind?: string }>(list: T[]) => list.filter((s) => !s.kind || kinds.has(s.kind));
+}
+
+const SECTIONS: { href: string; kind?: string; label: string; match: (p: string, k: string | null) => boolean }[] = [
   { href: "/", label: "Início", match: (p: string) => p === "/" },
-  { href: "/lista?k=movie", label: "Filmes", match: (p: string, k: string | null) => p === "/lista" && k === "movie" },
-  { href: "/lista?k=series", label: "Séries", match: (p: string, k: string | null) => p === "/lista" && k === "series" },
-  { href: "/lista?k=game", label: "Jogos", match: (p: string, k: string | null) => p === "/lista" && k === "game" },
-  { href: "/lista?k=book", label: "Livros", match: (p: string, k: string | null) => p === "/lista" && k === "book" },
-  { href: "/lista", label: "Tudo", match: (p: string, k: string | null) => p === "/lista" && !k },
+  { href: "/lista?k=movie", kind: "movie", label: "Filmes", match: (p: string, k: string | null) => p === "/lista" && k === "movie" },
+  { href: "/lista?k=series", kind: "series", label: "Séries", match: (p: string, k: string | null) => p === "/lista" && k === "series" },
+  { href: "/lista?k=game", kind: "game", label: "Jogos", match: (p: string, k: string | null) => p === "/lista" && k === "game" },
+  { href: "/lista?k=book", kind: "book", label: "Livros", match: (p: string, k: string | null) => p === "/lista" && k === "book" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -52,7 +59,8 @@ function TopBar() {
   const pathname = usePathname();
   const k = useSearchParams().get("k");
   const { scrolled } = useScrolled();
-  const { setDrawOpen, setSearchOpen } = useBacklog();
+  const { items, setDrawOpen, setSearchOpen } = useBacklog();
+  const withItems = useKindsWithItems();
 
   return (
     <header className="fixed inset-x-0 top-0 z-40 hidden px-6 pt-4 lg:block">
@@ -65,7 +73,7 @@ function TopBar() {
         </Link>
 
         <nav className="flex items-center gap-1 rounded-full bg-white/[0.04] p-1">
-          {SECTIONS.map((s) => {
+          {withItems(SECTIONS).map((s) => {
             const active = s.match(pathname, k);
             return (
               <Link
@@ -88,6 +96,8 @@ function TopBar() {
               </Link>
             );
           })}
+          <span className="mx-1 h-5 w-px bg-white/15" />
+          <PeopleSwitch />
         </nav>
 
         <div className="flex items-center gap-2">
@@ -97,12 +107,14 @@ function TopBar() {
           >
             <Search size={16} /> Buscar <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/60">Ctrl K</kbd>
           </button>
-          <button
-            onClick={() => setDrawOpen(true)}
-            className="btn-accent group tap flex h-10 items-center gap-2 rounded-full px-4 text-[14px] font-semibold"
-          >
-            <Dices size={18} className="transition-transform duration-500 group-hover:rotate-[200deg]" /> Sortear
-          </button>
+          {items.length > 0 && (
+            <button
+              onClick={() => setDrawOpen(true)}
+              className="btn-accent group tap flex h-10 items-center gap-2 rounded-full px-4 text-[14px] font-semibold"
+            >
+              <Dices size={18} className="transition-transform duration-500 group-hover:rotate-[200deg]" /> Sortear
+            </button>
+          )}
           <Link href="/adicionar" className="tap flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.06] hover:bg-white/10" aria-label="Adicionar">
             <Plus size={19} />
           </Link>
@@ -171,65 +183,181 @@ function AvatarMenu() {
   );
 }
 
-const DOCK = [
-  { href: "/", label: "Início", icon: House },
-  { href: "/lista", label: "Lista", icon: LayoutGrid },
-  { href: "draw", label: "Sortear", icon: Dices },
-  { href: "/adicionar", label: "Adicionar", icon: Plus },
-  { href: "/ajustes", label: "Perfil", icon: null },
+const DOCK: { href: string; kind?: string; label: string; icon: typeof House; match: (p: string, k: string | null) => boolean }[] = [
+  { href: "/", label: "Início", icon: House, match: (p: string) => p === "/" },
+  { href: "/lista?k=movie", kind: "movie", label: "Filmes", icon: Clapperboard, match: (p: string, k: string | null) => p === "/lista" && k === "movie" },
+  { href: "/lista?k=series", kind: "series", label: "Séries", icon: Tv, match: (p: string, k: string | null) => p === "/lista" && k === "series" },
+  { href: "/lista?k=game", kind: "game", label: "Jogos", icon: Gamepad2, match: (p: string, k: string | null) => p === "/lista" && k === "game" },
+  { href: "/lista?k=book", kind: "book", label: "Livros", icon: BookOpen, match: (p: string, k: string | null) => p === "/lista" && k === "book" },
 ];
 
+// Celular: doca espelhando a barra do topo + menu no avatar (sorteio fica no menu e na home)
 function Dock() {
   const pathname = usePathname();
+  const k = useSearchParams().get("k");
   const { hidden } = useScrolled();
-  const { me, reviewCount, setDrawOpen } = useBacklog();
-  const [spin, setSpin] = useState(0);
+  const { me, reviewCount } = useBacklog();
+  const withItems = useKindsWithItems();
+  const [menu, setMenu] = useState(false);
+  const menuActive = ["/ajustes", "/revisar", "/juntos", ...(withItems(DOCK).length < DOCK.length ? [] : ["/adicionar"])].some((p) => pathname.startsWith(p)) || pathname.startsWith("/pessoa");
 
   return (
-    <motion.nav
-      animate={{ y: hidden ? 120 : 0 }}
-      transition={{ type: "spring", stiffness: 380, damping: 36 }}
-      className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] lg:hidden"
-    >
-      <ul className="glass flex items-center gap-1 rounded-full p-1.5">
-        {DOCK.map(({ href, label, icon: Icon }) => {
-          if (href === "draw")
+    <>
+      <motion.nav
+        animate={{ y: hidden ? 120 : 0 }}
+        transition={{ type: "spring", stiffness: 380, damping: 36 }}
+        className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-center px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] lg:hidden"
+      >
+        <ul className="glass-nav flex w-full max-w-md items-center rounded-full p-1">
+          {withItems(DOCK).map(({ href, label, icon: Icon, match }) => {
+            const active = match(pathname, k);
             return (
-              <li key={href}>
-                <button
-                  onClick={() => {
-                    setSpin((s) => s + 1);
-                    setDrawOpen(true);
-                  }}
+              <li key={href} className="flex-1">
+                <Link
+                  href={href}
                   aria-label={label}
-                  className="btn-accent mx-1 flex h-12 w-12 items-center justify-center rounded-full active:scale-95"
+                  onClick={(e) => {
+                    if (pathname === "/lista" && href.startsWith("/lista")) {
+                      e.preventDefault();
+                      window.history.pushState(null, "", href);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }
+                  }}
+                  className="relative flex h-12 w-full items-center justify-center rounded-full"
                 >
-                  <motion.span animate={{ rotate: spin * 360 }} transition={{ type: "spring", stiffness: 120, damping: 14 }}>
-                    <Dices size={22} strokeWidth={2.2} />
-                  </motion.span>
-                </button>
+                  {active && <motion.span layoutId="dock-blob" className="btn-accent absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 32 }} />}
+                  <Icon size={21} strokeWidth={active ? 2.3 : 1.8} className={`relative transition-colors ${active ? "text-white" : "text-white/60"}`} />
+                </Link>
               </li>
             );
-          const active = href === "/" ? pathname === "/" : pathname.startsWith(href) || (href === "/ajustes" && pathname.startsWith("/revisar"));
-          return (
-            <li key={href}>
-              <Link href={href} aria-label={label} className="relative flex h-12 w-12 items-center justify-center rounded-full">
-                {active && (
-                  <motion.span layoutId="dock-blob" className="absolute inset-0 rounded-full bg-accent/20" transition={{ type: "spring", stiffness: 420, damping: 32 }} />
-                )}
-                {Icon ? (
-                  <Icon size={22} strokeWidth={active ? 2.3 : 1.8} className={`relative transition-colors ${active ? "text-accent-2" : "text-white/60"}`} />
-                ) : (
-                  <span className={`relative block h-7 w-7 overflow-hidden rounded-full ring-2 ${active ? "ring-accent" : "ring-white/20"}`}>
-                    {me.image ? <img src={me.image} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" /> : <span className="flex h-full items-center justify-center bg-bg-3 text-xs">{me.name?.[0]}</span>}
-                  </span>
-                )}
-                {href === "/ajustes" && reviewCount > 0 && <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-danger ring-2 ring-black/50" />}
+          })}
+          {/* Sobrou espaço (poucos tipos no backlog): atalho pra adicionar */}
+          {withItems(DOCK).length < DOCK.length && (
+            <li className="flex-1">
+              <Link href="/adicionar" aria-label="Adicionar" className="relative flex h-12 w-full items-center justify-center rounded-full">
+                {pathname === "/adicionar" && <motion.span layoutId="dock-blob" className="btn-accent absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 32 }} />}
+                <Plus size={22} strokeWidth={2.2} className={`relative ${pathname === "/adicionar" ? "text-white" : "text-white/60"}`} />
               </Link>
             </li>
-          );
-        })}
-      </ul>
-    </motion.nav>
+          )}
+          <li className="mx-1 h-6 w-px bg-white/15" />
+          <li>
+            <button onClick={() => setMenu(true)} aria-label="Menu" className="relative flex h-12 w-12 items-center justify-center">
+              <span className={`block h-8 w-8 overflow-hidden rounded-full ring-2 ${menuActive ? "ring-accent" : "ring-white/25"}`}>
+                {me.image ? <img src={me.image} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" /> : <span className="flex h-full items-center justify-center bg-bg-3 text-xs">{me.name?.[0]}</span>}
+              </span>
+              {reviewCount > 0 && <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-danger ring-2 ring-black/60" />}
+            </button>
+          </li>
+        </ul>
+
+      </motion.nav>
+      <MobileMenu open={menu} onClose={() => setMenu(false)} />
+    </>
+  );
+}
+
+function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
+  const { me, items, shared, reviewCount, setSearchOpen, setDrawOpen } = useBacklog();
+  const row = "flex items-center gap-4 rounded-2xl px-3 py-3 text-[16px] active:bg-white/10";
+  const icon = "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/[0.07]";
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div className="fixed inset-0 z-[60] flex items-end lg:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <button className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} aria-label="Fechar" />
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", stiffness: 380, damping: 38 }}
+            drag="y"
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0, bottom: 0.6 }}
+            onDragEnd={(_, info) => info.offset.y > 80 && onClose()}
+            className="glass-strong relative w-full rounded-t-[32px] p-3 pb-[calc(env(safe-area-inset-bottom)+16px)]"
+            onClick={(e) => (e.target as HTMLElement).closest("a,button[data-close]") && onClose()}
+          >
+            <div className="mx-auto mb-3 mt-1 h-1.5 w-10 rounded-full bg-white/20" />
+            <div className="flex items-center gap-3 px-3 pb-3">
+              <span className="h-12 w-12 overflow-hidden rounded-2xl bg-bg-3">
+                {me.image && <img src={me.image} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[17px] font-semibold">{me.name}</span>
+                <span className="block truncate text-[13px] text-white/50">{me.email}</span>
+              </span>
+            </div>
+            <div className={`grid ${items.length ? "grid-cols-3" : "grid-cols-2"} gap-2 px-1 pb-2`}>
+              <button data-close onClick={() => setSearchOpen(true)} className="glass flex h-[68px] flex-col items-center justify-center gap-1 rounded-2xl text-[13px] font-semibold">
+                <Search size={20} /> Buscar
+              </button>
+              {items.length > 0 && (
+                <button data-close onClick={() => setDrawOpen(true)} className="btn-accent flex h-[68px] flex-col items-center justify-center gap-1 rounded-2xl text-[13px] font-semibold">
+                  <Dices size={21} /> Sortear
+                </button>
+              )}
+              <Link href="/adicionar" className={`${items.length ? "glass" : "btn-accent"} flex h-[68px] flex-col items-center justify-center gap-1 rounded-2xl text-[13px] font-semibold`}>
+                <Plus size={21} /> Adicionar
+              </Link>
+            </div>
+            {shared.some((p) => p.count) && (
+              <Link href="/juntos" className={row}>
+                <span className={icon}>
+                  <HeartHandshake size={19} />
+                </span>
+                <span className="flex-1">Juntos</span>
+                <span className="text-[13px] text-white/45">{shared.reduce((s, p) => s + p.count, 0)} em comum</span>
+              </Link>
+            )}
+            {shared.map((p) => (
+              <Link key={p.userId} href={`/pessoa/${p.userId}`} className={row}>
+                <span className={`${icon} overflow-hidden`}>{p.image ? <img src={p.image} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" /> : <Eye size={19} />}</span>
+                <span className="flex-1">Espiar {p.name?.split(" ")[0]}</span>
+                <span className="text-[13px] text-white/45">{p.total} itens</span>
+              </Link>
+            ))}
+            {reviewCount > 0 && (
+              <Link href="/revisar" className={row}>
+                <span className={`${icon} text-danger`}>
+                  <ListChecks size={19} />
+                </span>
+                <span className="flex-1">Revisar</span>
+                <span className="rounded-full bg-danger px-2 text-[12px] font-semibold leading-5">{reviewCount}</span>
+              </Link>
+            )}
+            {items.length > 0 && (
+              <Link href="/lista" className={row}>
+                <span className={icon}>
+                  <LayoutGrid size={19} />
+                </span>
+                <span className="flex-1">Tudo</span>
+              </Link>
+            )}
+            <Link href="/ajustes" className={row}>
+              <span className={icon}>
+                <Settings2 size={19} />
+              </span>
+              <span className="flex-1">Perfil, tags e streamings</span>
+            </Link>
+            <button
+              data-close
+              className={`${row} w-full text-left text-white/70`}
+              onClick={async () => {
+                await authClient.signOut();
+                router.replace("/auth/sign-in");
+                router.refresh();
+              }}
+            >
+              <span className={icon}>
+                <LogOut size={19} />
+              </span>
+              Sair
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

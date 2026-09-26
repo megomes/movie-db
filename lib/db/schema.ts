@@ -9,6 +9,7 @@ import {
   jsonb,
   timestamp,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 export const kindEnum = pgEnum("item_kind", ["movie", "series", "game", "book"]);
@@ -119,6 +120,8 @@ export const items = pgTable(
     priority: integer("priority"),
     // "Quero muito": sobe na lista e pesa mais no sorteio
     pinned: boolean("pinned").notNull().default(false),
+    // Tags do dono (tabela tags), ex.: categoria do livro, console do jogo
+    tagIds: uuid("tag_ids").array().notNull().default([]),
 
     matchStatus: matchStatusEnum("match_status").notNull().default("matched"),
     candidates: jsonb("candidates").$type<Candidate[]>().notNull().default([]),
@@ -139,6 +142,22 @@ export const items = pgTable(
     index("items_done_idx").on(t.doneAt),
   ],
 );
+
+// Tags pessoais por divisão (cada pessoa gerencia as suas)
+export const tags = pgTable(
+  "tags",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: text("owner_id").notNull(),
+    kind: kindEnum("kind").notNull(),
+    name: text("name").notNull(),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("tags_owner_kind_name").on(t.ownerId, t.kind, t.name)],
+);
+
+export type Tag = typeof tags.$inferSelect;
 
 export const profiles = pgTable("profiles", {
   userId: text("user_id").primaryKey(),
