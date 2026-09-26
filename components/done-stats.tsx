@@ -1,20 +1,21 @@
 /* eslint-disable @next/next/no-img-element -- capas externas */
 "use client";
 
-import { useMemo, useState } from "react";
-import { motion } from "motion/react";
+import { useMemo, useState, useSyncExternalStore } from "react";
+import { useSearchParams } from "next/navigation";
+import { AnimatePresence, motion } from "motion/react";
 import { CalendarCheck, Check, CircleCheckBig, Flame, Lock, Plus, Zap } from "lucide-react";
 import type { Kind } from "@/lib/db/schema";
 import { coverSrc } from "@/lib/img";
 import { ptGenre } from "@/lib/genres";
-import { KIND_META, KINDS } from "@/lib/kinds";
+import { KIND_META, KINDS, STATS_MIN } from "@/lib/kinds";
 import type { LiteItem } from "@/lib/queries";
 import { KIND_ICONS } from "./kind-icon";
 
 // Cores por tipo (paleta categórica validada p/ daltonismo no fundo escuro; ordem fixa, nunca reciclada)
 export const KIND_COLOR: Record<Kind, string> = { movie: "#3987e5", series: "#d95926", game: "#199e70", book: "#c98500" };
 const ONE = "#3987e5"; // série única (dia da semana, gêneros)
-const MIN = 5; // abaixo disso, mostra o esqueleto explicando
+const MIN = STATS_MIN; // abaixo disso, mostra o esqueleto explicando
 const DAY = 86_400_000;
 const WEEK = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 const WEEK_FULL = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
@@ -78,6 +79,7 @@ export function DoneStats({ list, kind }: { list: LiteItem[]; kind: Kind | "all"
 
   return (
     <div className="space-y-3">
+      {kind === "all" && <UnlockBanner count={list.length} />}
       {/* Números de destaque */}
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         <Tile icon={CircleCheckBig} tone="#67d87a" value={String(list.length)} label="concluídos" />
@@ -286,6 +288,85 @@ function GenreBars({ genres }: { genres: [string, number][] }) {
         </div>
       ))}
     </div>
+  );
+}
+
+// Comemoração (uma vez) quando as estatísticas acabam de ser liberadas
+const SEEN_KEY = "stats-unlocked-seen";
+const readSeen = () => {
+  try {
+    return localStorage.getItem(SEEN_KEY) === "1";
+  } catch {
+    return true;
+  }
+};
+function UnlockBanner({ count }: { count: number }) {
+  const fromUnlock = useSearchParams().get("liberado") === "1";
+  const seen = useSyncExternalStore(
+    () => () => {},
+    readSeen,
+    () => true,
+  );
+  const [closed, setClosed] = useState(false);
+  const [bits] = useState(() =>
+    Array.from({ length: 36 }, (_, i) => {
+      const a = (i / 36) * Math.PI * 2;
+      const d = 80 + ((i * 37) % 90);
+      return { x: Math.cos(a) * d * 1.8, y: Math.sin(a) * d, r: (i * 97) % 540, c: [KIND_COLOR.movie, KIND_COLOR.series, KIND_COLOR.game, KIND_COLOR.book, "#fff"][i % 5] };
+    }),
+  );
+  const show = !closed && (fromUnlock || !seen);
+  const close = () => {
+    try {
+      localStorage.setItem(SEEN_KEY, "1");
+    } catch {}
+    setClosed(true);
+  };
+  return (
+    <AnimatePresence>
+      {show && (
+        <motion.div
+          initial={{ opacity: 0, y: -12, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+          className="relative overflow-hidden rounded-[28px] p-5 lg:p-6"
+          style={{ background: "linear-gradient(120deg, #1f4fd1 0%, #2f7bff 45%, #199e70 100%)" }}
+        >
+          {/* Confete saindo do cadeado */}
+          <span className="pointer-events-none absolute left-12 top-1/2 lg:left-14">
+            {bits.map((b, i) => (
+              <motion.span
+                key={i}
+                className={`absolute ${i % 3 ? "h-2.5 w-1.5 rounded-[2px]" : "h-2 w-2 rounded-full"}`}
+                style={{ background: b.c }}
+                initial={{ x: 0, y: 0, opacity: 1, rotate: 0 }}
+                animate={{ x: b.x, y: [0, b.y, b.y + 50], opacity: [1, 1, 0], rotate: b.r }}
+                transition={{ duration: 1.6, ease: "easeOut", delay: 0.25 }}
+              />
+            ))}
+          </span>
+          <div className="relative flex flex-wrap items-center gap-4">
+            <motion.span
+              initial={{ rotate: -20, scale: 0.6 }}
+              animate={{ rotate: 0, scale: 1 }}
+              transition={{ type: "spring", stiffness: 300, damping: 12, delay: 0.1 }}
+              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-[28px] backdrop-blur"
+            >
+              🔓
+            </motion.span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[20px] font-bold leading-tight tracking-tight lg:text-[24px]">Estatísticas liberadas!</p>
+              <p className="mt-0.5 text-[13px] leading-snug text-white/85 sm:text-[13.5px]">
+                {count} coisas vistas. Olha só o seu raio-x: o seu ano, o seu dia favorito, gêneros e umas curiosidades.
+              </p>
+            </div>
+            <button onClick={close} className="tap w-full shrink-0 rounded-full bg-white px-4 py-2.5 text-[14px] font-semibold text-black sm:w-auto sm:py-2 sm:text-[13px]">
+              Bora ver
+            </button>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 

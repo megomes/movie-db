@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Check, Heart, Loader2, MoreHorizontal, Pencil, Plus, RefreshCw, Replace, Tag, Trash2 } from "lucide-react";
 import { copyToMine, deleteItem, markDone, reenrich, setItemTags, togglePin, undoDone, updateNotes } from "@/app/actions";
 import type { Kind } from "@/lib/db/schema";
+import { STATS_MIN } from "@/lib/kinds";
 import { useAmbient, useBacklog } from "./backlog-context";
 import { useTagAsk } from "./tag-picker";
 
@@ -60,6 +61,32 @@ const SPARKS = [
 
 const DONE_TEXT: Record<Kind, string> = { movie: "Visto!", series: "Maratonada!", game: "Zerado!", book: "Lido!" };
 
+// Texto do aviso depois do "Já vi": progresso até liberar as estatísticas (e a comemoração no 5º)
+function DoneToastText({ nth }: { nth: number }) {
+  if (nth === STATS_MIN)
+    return (
+      <span className="min-w-0 text-[14px]">
+        <span className="block font-semibold">🔓 Você liberou suas estatísticas!</span>
+        <span className="block text-[12px] text-white/60">Seu ano, seu dia favorito e curiosidades</span>
+      </span>
+    );
+  if (nth < STATS_MIN)
+    return (
+      <span className="min-w-0 text-[14px]">
+        <span className="block">Tirado do backlog 🎉</span>
+        <span className="mt-1 flex items-center gap-1.5 text-[12px] text-white/60">
+          <span className="flex gap-1">
+            {Array.from({ length: STATS_MIN }, (_, i) => (
+              <span key={i} className={`h-1.5 w-1.5 rounded-full ${i < nth ? "bg-success" : "bg-white/20"}`} />
+            ))}
+          </span>
+          mais {STATS_MIN - nth} pra liberar suas estatísticas
+        </span>
+      </span>
+    );
+  return <span className="text-[14px]">Tirado do backlog 🎉</span>;
+}
+
 // Botão azul principal ("Watched ✓"). Depois de marcar, confete e 5s para desfazer.
 export function DoneButton({ itemId, kind }: { itemId: string; kind: Kind }) {
   const router = useRouter();
@@ -67,6 +94,8 @@ export function DoneButton({ itemId, kind }: { itemId: string; kind: Kind }) {
   const [done, setDone] = useState(false);
   const [left, setLeft] = useState<number | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { doneCount } = useBacklog();
+  const [nth, setNth] = useState(0); // quantos vistos com este
 
   useEffect(
     () => () => {
@@ -81,6 +110,8 @@ export function DoneButton({ itemId, kind }: { itemId: string; kind: Kind }) {
     const r = e.currentTarget.getBoundingClientRect();
     setOrigin({ x: ((e.clientX - r.left) / r.width) * 100 || 50, y: ((e.clientY - r.top) / r.height) * 100 || 50 });
     setDone(true);
+    const next = doneCount + 1;
+    setNth(next);
     navigator.vibrate?.([12, 30, 12]);
     start(async () => {
       await markDone(itemId);
@@ -90,7 +121,8 @@ export function DoneButton({ itemId, kind }: { itemId: string; kind: Kind }) {
           if (s === null) return null;
           if (s <= 1) {
             clearInterval(timer.current!);
-            router.push("/lista");
+            // O que liberou as estatísticas leva direto pra comemoração no Vistos
+            router.push(next === STATS_MIN ? "/vistos?liberado=1" : "/lista");
             return 0;
           }
           return s - 1;
@@ -182,10 +214,17 @@ export function DoneButton({ itemId, kind }: { itemId: string; kind: Kind }) {
             exit={{ y: 40, opacity: 0 }}
             className="glass-strong fixed inset-x-4 bottom-[calc(6.5rem+env(safe-area-inset-bottom))] z-50 mx-auto flex max-w-md items-center justify-between gap-3 rounded-2xl px-4 py-3 lg:bottom-8"
           >
-            <span className="text-[14px]">Tirado do backlog 🎉</span>
-            <button onClick={undo} className="tap rounded-full bg-white px-3.5 py-1.5 text-[13px] font-semibold text-black">
-              Desfazer · {left}
-            </button>
+            <DoneToastText nth={nth} />
+            <div className="flex shrink-0 items-center gap-1.5">
+              {nth === STATS_MIN && (
+                <Link href="/vistos?liberado=1" className="btn-accent tap rounded-full px-3.5 py-1.5 text-[13px] font-semibold">
+                  Ver agora
+                </Link>
+              )}
+              <button onClick={undo} className="tap rounded-full bg-white px-3.5 py-1.5 text-[13px] font-semibold text-black">
+                Desfazer · {left}
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
