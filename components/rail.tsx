@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, ChevronRight as Arrow } from "lucide-react";
+import { KIND_META, scoreLabel } from "@/lib/kinds";
 import type { LiteItem } from "@/lib/queries";
 import { Cover } from "./cover";
 import { attachDragScroll } from "./drag-scroll";
@@ -135,7 +136,7 @@ export function TopTen({ items, morphIds }: { items: LiteItem[]; morphIds?: Set<
               </span>
               <div className="relative w-[104px] transition-transform duration-300 group-hover:-translate-y-1.5 lg:w-[140px]">
                 <Cover item={i} morph={morphIds?.has(i.id)} rounded="rounded-xl" />
-                {mixed && <TypeBadge kind={i.kind} />}
+                <TopBadge item={i} showKind={mixed} />
               </div>
             </Link>
           ))}
@@ -146,11 +147,23 @@ export function TopTen({ items, morphIds }: { items: LiteItem[]; morphIds?: Set<
   );
 }
 
-function TypeBadge({ kind }: { kind: LiteItem["kind"] }) {
-  const Icon = KIND_ICONS[kind];
+// Selo do Top 10: tipo (quando mistura) + nota com a fonte, como no destaque da home
+function TopBadge({ item, showKind }: { item: LiteItem; showKind: boolean }) {
+  const Icon = KIND_ICONS[item.kind];
+  const score = scoreLabel(item);
+  if (!score && !showKind) return null;
   return (
-    <span className="glass absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full">
-      <Icon size={14} strokeWidth={2.2} />
+    <span className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded-lg bg-black/65 p-0.5 pr-1 text-[11px] font-bold ring-1 ring-white/10">
+      {showKind && (
+        <span className="flex h-5 w-5 items-center justify-center">
+          <Icon size={12} strokeWidth={2.4} aria-label={KIND_META[item.kind].label} />
+        </span>
+      )}
+      {score && (
+        <span className={`rounded-md px-1.5 py-px ${score.source === "IMDb" ? "bg-[#f5c518] text-black" : "bg-white/90 text-black"}`}>
+          {score.source} {score.value}
+        </span>
+      )}
     </span>
   );
 }

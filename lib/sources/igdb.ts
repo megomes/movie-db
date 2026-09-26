@@ -55,7 +55,7 @@ export async function searchIgdb(query: string): Promise<(Candidate & { populari
     externalId: String(g.id),
     title: g.name,
     year: year(g.first_release_date),
-    cover: img(g.cover?.image_id, "cover_small"),
+    cover: img(g.cover?.image_id, "cover_big_2x"), // os cards da busca são grandes: cover_small (90px) ficava borrado
     subtitle: ["Jogo", (g.platforms ?? []).map((p) => p.abbreviation ?? p.name).slice(0, 4).join(", ")]
       .filter(Boolean)
       .join(" · "),

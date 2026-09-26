@@ -40,7 +40,7 @@ function toCandidate(r: SearchResult, kind: TmdbKind): Candidate {
     externalId: String(r.id),
     title,
     year: yearOf(r.release_date ?? r.first_air_date),
-    cover: tmdbImage(r.poster_path, "w185"),
+    cover: tmdbImage(r.poster_path, "w500"),
     subtitle: [kind === "movie" ? "Filme" : "Série", original && original !== title ? original : null]
       .filter(Boolean)
       .join(" · "),

@@ -35,8 +35,14 @@ function coverOf(v: Volume) {
   if (!l) return null;
   const best = l.extraLarge ?? l.large ?? l.medium ?? l.small;
   if (best) return httpsImg(best);
-  // thumbnail é 128px; zoom=0 não é garantido, então pede largura maior via fife
-  return l.thumbnail ? `https://books.google.com/books/publisher/content/images/frontcover/${v.id}?fife=w480-h720&source=gbs_api` : null;
+  return bigThumb(l.thumbnail);
+}
+
+// thumbnail é 128px: a mesma URL aceita "fife" e devolve a capa maior. (O endpoint "publisher/content"
+// às vezes devolve uma imagem em branco, então fica fora.)
+function bigThumb(u?: string) {
+  const url = httpsImg(u);
+  return url ? `${url}&fife=w480-h720` : null;
 }
 
 const yearOf = (d?: string) => (d ? Number(d.slice(0, 4)) || null : null);
@@ -55,7 +61,7 @@ export async function searchBooks(query: string, author?: string): Promise<Candi
     externalId: v.id,
     title: v.volumeInfo.title,
     year: yearOf(v.volumeInfo.publishedDate),
-    cover: httpsImg(v.volumeInfo.imageLinks?.thumbnail),
+    cover: bigThumb(v.volumeInfo.imageLinks?.thumbnail),
     subtitle: ["Livro", v.volumeInfo.authors?.join(", ")].filter(Boolean).join(" · "),
   }));
 }
