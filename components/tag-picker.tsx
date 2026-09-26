@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element -- capa externa */
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Check, Loader2, Plus, Tag, X } from "lucide-react";
 import { createTag } from "@/app/actions";
@@ -152,10 +152,13 @@ function Panel({ request, onClose }: { request: TagPickerRequest; onClose: () =>
 export function useTagAsk() {
   const { tagsFor } = useBacklog();
   const [request, setRequest] = useState<TagPickerRequest | null>(null);
-  const ask = (req: TagPickerRequest) => {
-    if (tagsFor(req.kind).length === 0 && !req.initial) return req.onConfirm([]);
-    setRequest(req);
-  };
+  const ask = useCallback(
+    (req: TagPickerRequest) => {
+      if (tagsFor(req.kind).length === 0 && !req.initial) return req.onConfirm([]);
+      setRequest(req);
+    },
+    [tagsFor],
+  );
   const picker = <TagPicker request={request} onClose={() => setRequest(null)} />;
   return { ask, picker };
 }

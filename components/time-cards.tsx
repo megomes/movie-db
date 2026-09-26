@@ -60,7 +60,7 @@ function Card({ bucket }: { bucket: TimeBucket }) {
           transition={{ duration: 0.45 }}
         >
           {art ? (
-            <img src={art} alt="" className="ken-burns h-full w-full object-cover opacity-80" />
+            <img src={art} alt="" className="h-full w-full object-cover opacity-80" />
           ) : (
             item.coverUrl && <img src={coverSrc(item.coverUrl, "sm")!} alt="" className="h-full w-full scale-125 object-cover opacity-70 blur-2xl saturate-150" />
           )}

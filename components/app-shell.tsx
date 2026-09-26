@@ -203,7 +203,7 @@ function Dock() {
   const { me, reviewCount } = useBacklog();
   const withItems = useKindsWithItems();
   const [menu, setMenu] = useState(false);
-  const menuActive = ["/ajustes", "/revisar", "/juntos", ...(withItems(NAV).length < NAV.length ? [] : ["/adicionar"])].some((p) => pathname.startsWith(p)) || pathname.startsWith("/pessoa");
+  const menuActive = ["/ajustes", "/revisar", ...(withItems(NAV).length < NAV.length ? [] : ["/adicionar"])].some((p) => pathname.startsWith(p)) || pathname.startsWith("/pessoa");
 
   return (
     <>
@@ -235,6 +235,12 @@ function Dock() {
               </li>
             );
           })}
+          <li className="flex-1">
+            <Link href="/juntos" aria-label="Juntos" className="relative flex h-12 w-full items-center justify-center rounded-full">
+              {pathname === "/juntos" && <motion.span layoutId="dock-blob" className="btn-accent absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 32 }} />}
+              <HeartHandshake size={21} strokeWidth={pathname === "/juntos" ? 2.3 : 1.8} className={`relative transition-colors ${pathname === "/juntos" ? "text-white" : "text-white/60"}`} />
+            </Link>
+          </li>
           {/* Sobrou espaço (poucos tipos no backlog): atalho pra adicionar */}
           {withItems(NAV).length < NAV.length && (
             <li className="flex-1">

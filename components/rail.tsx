@@ -5,6 +5,7 @@ import { useRef } from "react";
 import { ChevronLeft, ChevronRight, ChevronRight as Arrow } from "lucide-react";
 import type { LiteItem } from "@/lib/queries";
 import { Cover } from "./cover";
+import { isMixed, KIND_ICONS } from "./kind-icon";
 import { Poster } from "./poster";
 
 export const GUTTER = "px-4 sm:px-6 lg:px-10";
@@ -64,6 +65,7 @@ export function Rail({
 }) {
   const { ref, by } = useRailScroll();
   if (!items.length && !empty) return null;
+  const mixed = isMixed(items);
   return (
     <section className="rise">
       <RailHeader title={title} subtitle={subtitle} href={items.length ? href : undefined} />
@@ -72,7 +74,7 @@ export function Rail({
           <div ref={ref} className={`no-scrollbar flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto overflow-y-hidden py-3 lg:scroll-px-10 lg:gap-4 ${GUTTER}`}>
             {items.slice(0, 24).map((i) => (
               <div key={i.id} className="w-[128px] shrink-0 snap-start sm:w-[150px] lg:w-[172px] 2xl:w-[196px]">
-                <Poster item={i} morph={morphIds?.has(i.id)} />
+                <Poster item={i} morph={morphIds?.has(i.id)} kindIcon={mixed} />
               </div>
             ))}
           </div>
@@ -89,6 +91,7 @@ export function Rail({
 export function TopTen({ items, morphIds }: { items: LiteItem[]; morphIds?: Set<string> }) {
   const { ref, by } = useRailScroll();
   if (items.length < 3) return null;
+  const mixed = isMixed(items);
   return (
     <section className="rise">
       <RailHeader title="Top 10 do seu backlog" subtitle="Os mais bem avaliados de cada tipo" />
@@ -104,6 +107,7 @@ export function TopTen({ items, morphIds }: { items: LiteItem[]; morphIds?: Set<
               </span>
               <div className="relative w-[104px] transition-transform duration-300 group-hover:-translate-y-1.5 lg:w-[140px]">
                 <Cover item={i} morph={morphIds?.has(i.id)} rounded="rounded-xl" />
+                {mixed && <TypeBadge kind={i.kind} />}
               </div>
             </Link>
           ))}
@@ -111,5 +115,14 @@ export function TopTen({ items, morphIds }: { items: LiteItem[]; morphIds?: Set<
         <Arrows by={by} />
       </div>
     </section>
+  );
+}
+
+function TypeBadge({ kind }: { kind: LiteItem["kind"] }) {
+  const Icon = KIND_ICONS[kind];
+  return (
+    <span className="glass absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full">
+      <Icon size={14} strokeWidth={2.2} />
+    </span>
   );
 }

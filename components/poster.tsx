@@ -4,10 +4,11 @@ import Link from "next/link";
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
 import { Heart } from "lucide-react";
 import type { CoverSize } from "@/lib/img";
-import { accessFor, formatMinutes, scoreLabel } from "@/lib/kinds";
+import { accessFor, formatMinutes, KIND_META, scoreLabel } from "@/lib/kinds";
 import type { LiteItem } from "@/lib/queries";
 import { useBacklog } from "./backlog-context";
 import { Cover } from "./cover";
+import { KIND_ICONS } from "./kind-icon";
 
 // Pôster interativo: inclina com o mouse (desktop), mostra nota e revela infos no hover.
 export function Poster({
@@ -17,6 +18,7 @@ export function Poster({
   size = "sm",
   href,
   showBadge = true,
+  kindIcon = false,
 }: {
   item: LiteItem;
   morph?: boolean;
@@ -24,6 +26,8 @@ export function Poster({
   size?: CoverSize;
   href?: string;
   showBadge?: boolean;
+  /** Ícone do tipo no selo (listas que misturam filmes, jogos, livros…) */
+  kindIcon?: boolean;
 }) {
   const { myProviders } = useBacklog();
   const mx = useMotionValue(0);
@@ -65,8 +69,11 @@ export function Poster({
           style={{ background: glare }}
         />
 
-        {showBadge && score && (
-          <span className="glass absolute left-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums">★ {score.value}</span>
+        {showBadge && (score || kindIcon) && (
+          <span className="glass absolute left-2 top-2 flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums">
+            {kindIcon && <KindIcon kind={item.kind} />}
+            {score && `★ ${score.value}`}
+          </span>
         )}
         {item.pinned && (
           <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-danger/90">
@@ -89,4 +96,9 @@ export function Poster({
       </motion.div>
     </Link>
   );
+}
+
+function KindIcon({ kind }: { kind: LiteItem["kind"] }) {
+  const Icon = KIND_ICONS[kind];
+  return <Icon size={12} strokeWidth={2.4} className="-ml-0.5 text-white/90" aria-label={KIND_META[kind].label} />;
 }

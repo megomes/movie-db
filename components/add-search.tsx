@@ -2,42 +2,45 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Check, Loader2, Plus, Search, X } from "lucide-react";
-import { addItem, resolveImdb, searchAction } from "@/app/actions";
+import { addItem, resolveImdb } from "@/app/actions";
 import type { Kind } from "@/lib/db/schema";
 import { KIND_META, KINDS } from "@/lib/kinds";
+import type { SearchResult as Result } from "@/lib/search";
 import { normalize } from "@/lib/sources/http";
 import { useBacklog } from "./backlog-context";
 import { useTagAsk } from "./tag-picker";
-
-type Result = Awaited<ReturnType<typeof searchAction>>[number];
 
 export function useSearch(kind: Kind | "any", query: string) {
   const [results, setResults] = useState<Result[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const seq = useRef(0);
   const active = query.trim().length >= 2;
 
   useEffect(() => {
     const q = query.trim();
     if (q.length < 2) return;
-    const id = ++seq.current;
+    const ctrl = new AbortController();
     const t = setTimeout(async () => {
       setLoading(true);
       setError(null);
       try {
-        const r = await searchAction(kind, q);
-        if (id === seq.current) setResults(r);
+        const res = await fetch(`/api/search?${new URLSearchParams({ kind, q })}`, { signal: ctrl.signal });
+        if (!res.ok) throw new Error();
+        setResults(await res.json());
+        setLoading(false);
       } catch {
-        if (id === seq.current) setError("A busca falhou. Tenta de novo.");
-      } finally {
-        if (id === seq.current) setLoading(false);
+        if (ctrl.signal.aborted) return;
+        setError("A busca falhou. Tenta de novo.");
+        setLoading(false);
       }
-    }, 380);
-    return () => clearTimeout(t);
+    }, 280);
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
   }, [kind, query]);
 
   return { results: active ? results : [], loading: active && loading, error: active ? error : null };
@@ -52,32 +55,35 @@ export function AddSearch({ initialQuery, initialKind, imdbId }: { initialQuery:
   const { ask, picker } = useTagAsk();
 
   // Marca o que já está no backlog (pelo título + ano)
-  const owned = new Set(items.map((i) => `${normalize(i.title)}|${i.year ?? ""}`));
+  const owned = useMemo(() => new Set(items.map((i) => `${normalize(i.title)}|${i.year ?? ""}`)), [items]);
 
   // Sempre pergunta a tag quando a divisão tem tags
-  function add(r: Result) {
-    const key = `${r.kind}:${r.externalId}`;
-    ask({
-      kind: r.kind,
-      title: r.title,
-      cover: r.cover,
-      confirmLabel: "Adicionar ao backlog",
-      onConfirm: async (tagIds) => {
-        setStatus((s) => ({ ...s, [key]: "adding" }));
-        try {
-          const id = await addItem(r.kind, r.externalId, tagIds);
-          setStatus((s) => ({ ...s, [key]: id }));
-          navigator.vibrate?.(12);
-        } catch {
-          setStatus((s) => {
-            const next = { ...s };
-            delete next[key];
-            return next;
-          });
-        }
-      },
-    });
-  }
+  const add = useCallback(
+    (r: Result) => {
+      const key = `${r.kind}:${r.externalId}`;
+      ask({
+        kind: r.kind,
+        title: r.title,
+        cover: r.cover,
+        confirmLabel: "Adicionar ao backlog",
+        onConfirm: async (tagIds) => {
+          setStatus((s) => ({ ...s, [key]: "adding" }));
+          try {
+            const id = await addItem(r.kind, r.externalId, tagIds);
+            setStatus((s) => ({ ...s, [key]: id }));
+            navigator.vibrate?.(12);
+          } catch {
+            setStatus((s) => {
+              const next = { ...s };
+              delete next[key];
+              return next;
+            });
+          }
+        },
+      });
+    },
+    [ask],
+  );
 
   return (
     <div>
@@ -139,56 +145,48 @@ export function AddSearch({ initialQuery, initialKind, imdbId }: { initialQuery:
       {error && <p className="mt-4 text-sm text-danger">{error}</p>}
 
       <div className="mt-6 grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6 lg:gap-5">
-        <AnimatePresence mode="popLayout">
-          {results.map((r, idx) => {
-            const key = `${r.kind}:${r.externalId}`;
-            const st = status[key];
-            const already = owned.has(`${normalize(r.title)}|${r.year ?? ""}`);
-            const done = (st && st !== "adding") || already;
-            return (
-              <motion.div
-                key={key}
-                layout
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ delay: Math.min(idx, 12) * 0.025 }}
-                className="min-w-0"
-              >
-                <div className="group relative aspect-[2/3] overflow-hidden rounded-2xl bg-bg-3">
-                  {r.cover ? (
-                    <img src={r.cover} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                  ) : (
-                    <div className="flex h-full items-end p-2.5 text-[12px] font-semibold text-white/70">{r.title}</div>
-                  )}
-                  <span className="glass absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider">{KIND_META[r.kind].label}</span>
-                  <motion.button
-                    whileTap={{ scale: 0.85 }}
-                    onClick={() => !done && st !== "adding" && add(r)}
-                    className={`absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full shadow-lg ${done ? "bg-success text-black" : "btn-accent"}`}
-                    aria-label={done ? "No backlog" : `Adicionar ${r.title}`}
-                  >
-                    <AnimatePresence mode="wait" initial={false}>
-                      <motion.span key={st === "adding" ? "l" : done ? "d" : "p"} initial={{ scale: 0.3, rotate: -90 }} animate={{ scale: 1, rotate: 0 }} exit={{ scale: 0.3 }}>
-                        {st === "adding" ? <Loader2 size={18} className="animate-spin" /> : done ? <Check size={19} strokeWidth={3} /> : <Plus size={20} strokeWidth={2.6} />}
-                      </motion.span>
-                    </AnimatePresence>
-                  </motion.button>
-                </div>
-                <p className="mt-2 text-[13px] font-semibold leading-tight line-clamp-2">{r.title}</p>
-                <p className="truncate text-[11.5px] text-white/50">{[r.year, r.subtitle?.split(" · ").slice(1).join(" · ")].filter(Boolean).join(" · ")}</p>
-                {st && st !== "adding" && (
-                  <Link href={`/item/${st}`} className="text-[12px] font-medium text-accent-2">
-                    Ver →
-                  </Link>
-                )}
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
+        {results.map((r, idx) => {
+          const key = `${r.kind}:${r.externalId}`;
+          return <ResultCard key={key} r={r} idx={idx} st={status[key]} already={owned.has(`${normalize(r.title)}|${r.year ?? ""}`)} onAdd={add} />;
+        })}
       </div>
       {!loading && query.trim().length >= 2 && !results.length && !error && <p className="mt-10 text-center text-text-2">Nada encontrado.</p>}
       {query.trim().length < 2 && <p className="mt-10 text-center text-[14px] text-text-3">Dica: no Android, compartilhe um link do IMDb ou da Steam direto para o app.</p>}
     </div>
   );
 }
+
+// Cartão memoizado: digitar na busca não re-renderiza a grade inteira
+const ResultCard = memo(function ResultCard({ r, idx, st, already, onAdd }: { r: Result; idx: number; st?: string; already: boolean; onAdd: (r: Result) => void }) {
+  const done = (st && st !== "adding") || already;
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: Math.min(idx, 8) * 0.02 }} className="min-w-0">
+      <div className="group relative aspect-[2/3] overflow-hidden rounded-2xl bg-bg-3">
+        {r.cover ? (
+          <img src={r.cover} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        ) : (
+          <div className="flex h-full items-end p-2.5 text-[12px] font-semibold text-white/70">{r.title}</div>
+        )}
+        <span className="glass absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider">{KIND_META[r.kind].label}</span>
+        <button
+          onClick={() => !done && st !== "adding" && onAdd(r)}
+          className={`absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full shadow-lg transition-[transform,background-color] duration-150 active:scale-[0.85] ${done ? "bg-success text-black" : "btn-accent"}`}
+          aria-label={done ? "No backlog" : `Adicionar ${r.title}`}
+        >
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.span key={st === "adding" ? "l" : done ? "d" : "p"} initial={{ scale: 0.3, rotate: -90 }} animate={{ scale: 1, rotate: 0 }} exit={{ scale: 0.3 }} transition={{ duration: 0.15 }}>
+              {st === "adding" ? <Loader2 size={18} className="animate-spin" /> : done ? <Check size={19} strokeWidth={3} /> : <Plus size={20} strokeWidth={2.6} />}
+            </motion.span>
+          </AnimatePresence>
+        </button>
+      </div>
+      <p className="mt-2 text-[13px] font-semibold leading-tight line-clamp-2">{r.title}</p>
+      <p className="truncate text-[11.5px] text-white/50">{[r.year, r.subtitle?.split(" · ").slice(1).join(" · ")].filter(Boolean).join(" · ")}</p>
+      {st && st !== "adding" && (
+        <Link href={`/item/${st}`} className="text-[12px] font-medium text-accent-2">
+          Ver →
+        </Link>
+      )}
+    </motion.div>
+  );
+});

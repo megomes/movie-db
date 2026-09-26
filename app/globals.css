@@ -146,6 +146,12 @@ body {
 }
 .ken-burns {
   animation: ken-burns 14s ease-out both;
+  /* Camada própria: sem isso o Firefox repinta a arte inteira a cada quadro e trava o resto da página */
+  will-change: transform;
+}
+/* Destaque fora da tela: congela o zoom */
+.offscreen .ken-burns {
+  animation-play-state: paused;
 }
 
 /* Trilhos: some suavemente nas bordas */

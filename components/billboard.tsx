@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Dices, Heart, Info } from "lucide-react";
 import { togglePin } from "@/app/actions";
@@ -23,6 +23,16 @@ export function Billboard({ featured }: { featured: LiteItem[] }) {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [spin, setSpin] = useState(0);
+  // Fora da tela: para a rotação e o zoom (economiza CPU enquanto rola pelas prateleiras)
+  const [onScreen, setOnScreen] = useState(true);
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => setOnScreen(e.isIntersecting), { threshold: 0.05 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   const item = featured[index];
 
   useEffect(() => {
@@ -30,10 +40,10 @@ export function Billboard({ featured }: { featured: LiteItem[] }) {
   }, [item, setAmbient]);
 
   useEffect(() => {
-    if (paused || featured.length < 2) return;
+    if (paused || !onScreen || featured.length < 2) return;
     const t = setTimeout(() => setIndex((i) => (i + 1) % featured.length), DURATION);
     return () => clearTimeout(t);
-  }, [index, paused, featured.length]);
+  }, [index, paused, onScreen, featured.length]);
 
   // Pré-carrega o próximo
   useEffect(() => {
@@ -45,7 +55,7 @@ export function Billboard({ featured }: { featured: LiteItem[] }) {
   const go = (d: number) => setIndex((i) => (i + d + featured.length) % featured.length);
 
   return (
-    <section onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} className="relative">
+    <section ref={ref} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} className={`relative ${onScreen ? "" : "offscreen"}`}>
       {/* Desktop: arte em tela cheia */}
       <div className="relative hidden h-[86vh] min-h-[600px] overflow-hidden lg:block">
         <AnimatePresence initial={false}>
@@ -65,7 +75,7 @@ export function Billboard({ featured }: { featured: LiteItem[] }) {
           <Actions key={item.id} item={item} onDraw={() => setDrawOpen(true)} />
         </div>
 
-        <Progress featured={featured} index={index} paused={paused} onPick={setIndex} className="absolute bottom-[14%] right-10" />
+        <Progress featured={featured} index={index} paused={paused || !onScreen} onPick={setIndex} className="absolute bottom-[14%] right-10" />
       </div>
 
       {/* Celular: card de arte arrastável */}
@@ -129,7 +139,7 @@ export function Billboard({ featured }: { featured: LiteItem[] }) {
         </motion.div>
         <div className="mt-4 flex items-center justify-between gap-3">
           <Actions key={item.id} item={item} onDraw={() => setDrawOpen(true)} compact />
-          <Progress featured={featured} index={index} paused={paused} onPick={setIndex} />
+          <Progress featured={featured} index={index} paused={paused || !onScreen} onPick={setIndex} />
         </div>
       </div>
     </section>
@@ -229,11 +239,12 @@ function Progress({ featured, index, paused, onPick, className = "" }: { feature
         >
           {i < index && <span className="absolute inset-0 bg-white/70" />}
           {i === index && (
+            // scaleX em vez de width: roda no compositor, sem recalcular layout a cada quadro
             <motion.span
               key={`${f.id}-${paused}`}
-              className="absolute inset-y-0 left-0 bg-white"
-              initial={{ width: paused ? "100%" : "0%" }}
-              animate={{ width: "100%" }}
+              className="absolute inset-0 origin-left bg-white"
+              initial={{ scaleX: paused ? 1 : 0 }}
+              animate={{ scaleX: 1 }}
               transition={{ duration: paused ? 0 : DURATION / 1000, ease: "linear" }}
             />
           )}

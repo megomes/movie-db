@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, items, profiles, pushSubscriptions, tags, type Kind } from "@/lib/db";
 import { requireUser } from "@/lib/session";
-import { enrich, searchCandidates } from "@/lib/enrich";
-import { findByImdbId, searchTmdbMulti } from "@/lib/sources/tmdb";
+import { enrich } from "@/lib/enrich";
+import { findByImdbId } from "@/lib/sources/tmdb";
 
 const KINDS = new Set<Kind>(["movie", "series", "game", "book"]);
 const assertKind = (k: string): Kind => {
@@ -56,24 +56,6 @@ export async function updateNotes(itemId: string, notes: string) {
   await own(itemId);
   await db.update(items).set({ notes: notes.trim() || null }).where(eq(items.id, itemId));
   refresh(itemId);
-}
-
-export async function searchAction(kind: string, query: string) {
-  await requireUser();
-  const q = query.trim();
-  if (!q) return [];
-  if (kind === "any") {
-    const [av, games, books] = await Promise.allSettled([searchTmdbMulti(q), searchCandidates("game", q), searchCandidates("book", q)]);
-    const ok = <T,>(r: PromiseSettledResult<T[]>) => (r.status === "fulfilled" ? r.value : []);
-    return [
-      ...ok(av),
-      ...ok(games).slice(0, 6).map((c) => ({ ...c, kind: "game" as const })),
-      ...ok(books).slice(0, 6).map((c) => ({ ...c, kind: "book" as const })),
-    ].map(({ externalId, title, year, cover, subtitle, kind }) => ({ externalId, title, year, cover, subtitle, kind }));
-  }
-  const k = assertKind(kind);
-  const results = await searchCandidates(k, q);
-  return results.map(({ externalId, title, year, cover, subtitle }) => ({ externalId, title, year, cover, subtitle, kind: k }));
 }
 
 // Só aceita tags do próprio usuário e da mesma divisão; devolve também os campos legados sincronizados

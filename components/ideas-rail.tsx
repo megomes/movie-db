@@ -7,6 +7,7 @@ import { Check, ChevronRight, Loader2, Plus } from "lucide-react";
 import { copyToMine } from "@/app/actions";
 import type { Ideas, LiteItem } from "@/lib/queries";
 import { Avatar } from "./people-switch";
+import { isMixed } from "./kind-icon";
 import { Poster } from "./poster";
 import { Arrows, GUTTER, useRailScroll } from "./rail";
 import { useTagAsk } from "./tag-picker";
@@ -19,6 +20,7 @@ export function IdeasRail({ ideas, title, subtitle }: { ideas: Ideas; title?: st
   const { ask, picker } = useTagAsk();
   if (!ideas.items.length) return null;
   const solo = ideas.from.length === 1 ? ideas.from[0] : null;
+  const mixed = isMixed(ideas.items);
 
   return (
     <section className="rise">
@@ -54,7 +56,7 @@ export function IdeasRail({ ideas, title, subtitle }: { ideas: Ideas; title?: st
                 exit={{ opacity: 0, scale: 0.6, y: -40, transition: { duration: 0.35 } }}
                 className="relative w-[128px] shrink-0 snap-start sm:w-[150px] lg:w-[172px] 2xl:w-[196px]"
               >
-                <Poster item={i} />
+                <Poster item={i} kindIcon={mixed} />
                 <AddIdea item={i} ask={ask} />
               </motion.div>
             ))}
