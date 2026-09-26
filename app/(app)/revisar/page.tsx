@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { PageHeader } from "@/components/page-header";
 import { ReviewCard } from "@/components/review-card";
 import { db, items } from "@/lib/db";
 import { listReviewItems } from "@/lib/queries";
@@ -9,22 +10,22 @@ export const metadata = { title: "Revisar" };
 export default async function ReviewPage({ searchParams }: PageProps<"/revisar">) {
   await requireUser();
   const { item: only } = await searchParams;
-  const rows =
-    typeof only === "string" && /^[0-9a-f-]{36}$/i.test(only)
-      ? await db.select().from(items).where(eq(items.id, only))
-      : await listReviewItems();
+  const single = typeof only === "string" && /^[0-9a-f-]{36}$/i.test(only);
+  const rows = single ? await db.select().from(items).where(eq(items.id, only)) : await listReviewItems();
 
   return (
-    <div className="px-4 pt-6">
-      <h1 className="font-display text-3xl font-extrabold">{typeof only === "string" ? "Trocar item" : "Revisar"}</h1>
-      <p className="mt-1 text-sm text-muted">
-        {typeof only === "string"
-          ? "Escolha a versão certa ou busque outra."
-          : rows.length
-            ? `${rows.length} itens em que eu não tive certeza. Confirme, escolha outro ou remova.`
-            : "Tudo revisado. 🎉"}
-      </p>
-      <div className="mt-5 space-y-4">
+    <div>
+      <PageHeader
+        title={single ? "Trocar item" : "Revisar"}
+        subtitle={
+          single
+            ? "Escolha a versão certa ou busque outra."
+            : rows.length
+              ? `${rows.length} itens em que não tive certeza.`
+              : "Tudo revisado."
+        }
+      />
+      <div className="divide-y divide-line border-t border-line">
         {rows.map((r) => (
           <ReviewCard
             key={r.id}
@@ -40,7 +41,7 @@ export default async function ReviewPage({ searchParams }: PageProps<"/revisar">
               candidates: r.candidates,
               sourcePath: r.sourcePath,
             }}
-            single={typeof only === "string"}
+            single={single}
           />
         ))}
       </div>

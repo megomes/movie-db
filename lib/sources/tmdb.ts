@@ -111,7 +111,10 @@ type Details = {
   imdb_id?: string | null;
   vote_average?: number;
   created_by?: { name: string }[];
-  credits?: { crew?: { job: string; name: string }[] };
+  credits?: {
+    crew?: { job: string; name: string }[];
+    cast?: { name: string; character?: string; profile_path?: string | null; order?: number }[];
+  };
   external_ids?: { imdb_id?: string | null };
   "watch/providers"?: { results?: Record<string, ProvidersBlock> };
 };
@@ -146,6 +149,11 @@ export async function getTmdbDetails(kind: TmdbKind, id: number | string): Promi
     overview,
     genres: (d.genres ?? []).map((g) => g.name),
     creators: creators.slice(0, 3),
+    cast: (d.credits?.cast ?? []).slice(0, 12).map((c) => ({
+      name: c.name,
+      role: c.character || null,
+      photo: tmdbImage(c.profile_path, "w185"),
+    })),
     imdbId: d.imdb_id ?? d.external_ids?.imdb_id ?? null,
     runtimeMinutes: kind === "movie" ? d.runtime || null : epRuntime,
     seasons: d.number_of_seasons ?? null,

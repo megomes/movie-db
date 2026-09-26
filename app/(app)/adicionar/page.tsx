@@ -1,4 +1,5 @@
 import { AddSearch } from "@/components/add-search";
+import { PageHeader } from "@/components/page-header";
 
 export const metadata = { title: "Adicionar" };
 
@@ -21,10 +22,11 @@ export default async function AddPage({ searchParams }: PageProps<"/adicionar">)
   const initialKind = steamTitle ? "game" : "any";
 
   return (
-    <div className="px-4 pt-6">
-      <h1 className="font-display text-3xl font-extrabold">Adicionar</h1>
-      <p className="mt-1 text-sm text-muted">Busca em TMDB, IGDB e Google Books ao mesmo tempo.</p>
-      <AddSearch initialQuery={initialQuery} initialKind={initialKind} imdbId={imdbId} />
+    <div>
+      <PageHeader title="Adicionar" subtitle="Filmes, séries, jogos e livros numa busca só." />
+      <div className="px-4">
+        <AddSearch initialQuery={initialQuery} initialKind={initialKind} imdbId={imdbId} />
+      </div>
     </div>
   );
 }

@@ -2,11 +2,11 @@ import type { Availability, Item, Kind, Provider } from "@/lib/db/schema";
 
 export const KINDS: Kind[] = ["movie", "series", "game", "book"];
 
-export const KIND_META: Record<Kind, { label: string; plural: string; color: string; verb: string }> = {
-  movie: { label: "Filme", plural: "Filmes", color: "var(--c-movie)", verb: "assistir" },
-  series: { label: "Série", plural: "Séries", color: "var(--c-series)", verb: "maratonar" },
-  game: { label: "Jogo", plural: "Jogos", color: "var(--c-game)", verb: "jogar" },
-  book: { label: "Livro", plural: "Livros", color: "var(--c-book)", verb: "ler" },
+export const KIND_META: Record<Kind, { label: string; plural: string; verb: string }> = {
+  movie: { label: "Filme", plural: "Filmes", verb: "assistir" },
+  series: { label: "Série", plural: "Séries", verb: "maratonar" },
+  game: { label: "Jogo", plural: "Jogos", verb: "jogar" },
+  book: { label: "Livro", plural: "Livros", verb: "ler" },
 };
 
 export type Tier = "mine" | "stream" | "rent" | "none" | "owned" | "shop" | "unknown";
@@ -43,14 +43,15 @@ export function accessFor(item: Pick<Item, "kind" | "availability" | "myPlatform
   return { tier: "shop", label: "Livro", providers: [] };
 }
 
+// Só o que já está liberado pra você ganha cor (verde); o resto fica neutro
 export const TIER_COLOR: Record<Tier, string> = {
-  mine: "var(--ok)",
-  stream: "var(--info)",
-  rent: "var(--warn)",
-  shop: "var(--warn)",
-  none: "var(--muted)",
-  owned: "var(--ok)",
-  unknown: "var(--muted)",
+  mine: "var(--success)",
+  stream: "var(--text-2)",
+  rent: "var(--text-2)",
+  shop: "var(--text-2)",
+  none: "var(--text-3)",
+  owned: "var(--success)",
+  unknown: "var(--text-3)",
 };
 
 export function formatMinutes(min: number | null | undefined, kind: Kind) {

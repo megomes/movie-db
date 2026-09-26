@@ -2,43 +2,34 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Dices, LayoutGrid, Plus, ListChecks, Settings2 } from "lucide-react";
+import { House, LayoutGrid, ListChecks, Plus, User } from "lucide-react";
 
 const TABS = [
-  { href: "/", label: "E agora?", icon: Dices },
+  { href: "/", label: "Início", icon: House },
   { href: "/lista", label: "Lista", icon: LayoutGrid },
-  { href: "/adicionar", label: "Adicionar", icon: Plus, primary: true },
+  { href: "/adicionar", label: "Adicionar", icon: Plus },
   { href: "/revisar", label: "Revisar", icon: ListChecks },
-  { href: "/ajustes", label: "Ajustes", icon: Settings2 },
+  { href: "/ajustes", label: "Ajustes", icon: User },
 ];
 
 export function BottomNav({ reviewCount }: { reviewCount: number }) {
   const pathname = usePathname();
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-bg/85 backdrop-blur-xl pb-[env(safe-area-inset-bottom)]">
-      <ul className="mx-auto flex max-w-xl items-stretch justify-around px-2">
-        {TABS.map(({ href, label, icon: Icon, primary }) => {
+    <nav className="fixed inset-x-0 bottom-0 z-40 bg-nav pb-[env(safe-area-inset-bottom)] backdrop-blur-xl">
+      <ul className="mx-auto flex max-w-xl items-center justify-around px-4">
+        {TABS.map(({ href, label, icon: Icon }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
-            <li key={href} className="flex-1">
+            <li key={href}>
               <Link
                 href={href}
-                className={`relative flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors ${
-                  active ? "text-text" : "text-muted"
-                }`}
+                aria-label={label}
+                aria-current={active ? "page" : undefined}
+                className={`relative flex h-14 w-14 items-center justify-center transition-opacity duration-150 ${active ? "opacity-100" : "opacity-50"}`}
               >
-                {primary ? (
-                  <span className="-mt-1 flex h-9 w-9 items-center justify-center rounded-full bg-accent text-accent-ink shadow-lg shadow-accent/20">
-                    <Icon size={20} strokeWidth={2.5} />
-                  </span>
-                ) : (
-                  <Icon size={22} strokeWidth={active ? 2.4 : 1.8} />
-                )}
-                {!primary && label}
+                <Icon size={22} strokeWidth={active ? 2.3 : 1.9} />
                 {href === "/revisar" && reviewCount > 0 && (
-                  <span className="absolute right-[22%] top-1.5 min-w-4 rounded-full bg-danger px-1 text-center text-[10px] font-bold leading-4 text-white">
-                    {reviewCount}
-                  </span>
+                  <span className="absolute right-3 top-3.5 h-2 w-2 rounded-full bg-danger" aria-label={`${reviewCount} para revisar`} />
                 )}
               </Link>
             </li>

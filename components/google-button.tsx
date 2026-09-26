@@ -23,7 +23,7 @@ export function GoogleButton() {
           }
         }}
         disabled={pending}
-        className="mt-10 flex w-full max-w-xs items-center justify-center gap-3 rounded-2xl bg-text py-3.5 font-semibold text-bg active:scale-[0.98] disabled:opacity-70"
+        className="tap mt-10 flex h-11 w-full max-w-xs items-center justify-center gap-3 rounded-full bg-text text-[15px] font-medium text-bg disabled:opacity-70"
       >
         {pending ? (
           <Loader2 size={20} className="animate-spin" />

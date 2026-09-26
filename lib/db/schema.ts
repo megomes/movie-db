@@ -51,6 +51,8 @@ export type SteamPrice = {
   isFree: boolean;
 };
 
+export type CastMember = { name: string; role: string | null; photo: string | null };
+
 export type Candidate = {
   externalId: string;
   title: string;
@@ -72,6 +74,7 @@ export const items = pgTable(
     overview: text("overview"),
     genres: text("genres").array().notNull().default([]),
     creators: text("creators").array().notNull().default([]),
+    cast: jsonb("cast").$type<CastMember[]>().notNull().default([]),
 
     // Tempo pra consumir, normalizado em minutos (filme: duração; série: total estimado; jogo: tempo pra zerar; livro: páginas * 1.5)
     minutes: integer("minutes"),

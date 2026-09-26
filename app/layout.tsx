@@ -1,17 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, Geist } from "next/font/google";
+import { Geist } from "next/font/google";
 import { ServiceWorker } from "@/components/service-worker";
 import "./globals.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
-});
-
-const display = Bricolage_Grotesque({
-  variable: "--font-display",
-  subsets: ["latin"],
-  weight: ["600", "800"],
 });
 
 export const metadata: Metadata = {
@@ -21,13 +15,13 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0c0b10",
+  themeColor: "#070707",
   viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="pt-BR" className={`${geistSans.variable} ${display.variable} h-full antialiased`}>
+    <html lang="pt-BR" className={`${geistSans.variable} h-full antialiased`}>
       <body className="min-h-full">
         {children}
         <ServiceWorker />

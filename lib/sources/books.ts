@@ -76,6 +76,7 @@ async function hardcoverSearch(title: string, author?: string | null) {
     pages?: number;
     release_year?: number;
     image?: { url?: string };
+    contributions?: { author?: { name: string; image?: { url?: string } | null } }[];
   };
   const res = await fetchJson<{ data?: { search?: { results?: { hits?: { document: Doc }[] } } } }>(
     "https://api.hardcover.app/v1/graphql",
@@ -130,6 +131,10 @@ export async function getBookDetails(googleId: string, hint?: { author?: string 
     overview: description,
     genres: (info.categories ?? []).flatMap((c) => c.split(" / ")).slice(0, 3),
     creators: authors,
+    cast: (hc?.contributions ?? [])
+      .filter((c) => c.author)
+      .slice(0, 4)
+      .map((c) => ({ name: c.author!.name, role: "Autor", photo: c.author!.image?.url ?? null })),
     pages,
     minutes: pages ? Math.round(pages * 1.2) : null,
     ratings: {

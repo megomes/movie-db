@@ -10,7 +10,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   const reviewCount = await countReview();
   return (
     <>
-      <main className="mx-auto w-full max-w-5xl pb-nav pt-[env(safe-area-inset-top)]">{children}</main>
+      <main className="mx-auto w-full max-w-5xl pb-nav">{children}</main>
       <BottomNav reviewCount={reviewCount} />
     </>
   );

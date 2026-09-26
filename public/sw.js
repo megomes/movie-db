@@ -9,8 +9,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: "/icons/192",
-      badge: "/icons/96",
+      icon: "/icons/icon-192.png",
+      badge: "/icons/badge-96.png",
       image: data.image || undefined,
       data: { url: data.url || "/" },
     }),

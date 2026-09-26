@@ -1,0 +1,1 @@
+ALTER TABLE "items" ADD COLUMN "cast" jsonb DEFAULT '[]'::jsonb NOT NULL;

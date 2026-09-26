@@ -1,25 +1,15 @@
 "use client";
 
-export function Chip({
-  active,
-  onClick,
-  children,
-  color,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-  color?: string;
-}) {
+// Pílula compacta de filtro: ativa = branca com texto preto; inativa = contorno sutil
+export function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`shrink-0 rounded-full px-3.5 py-1.5 text-[13px] font-medium ring-1 transition-colors ${
-        active ? "bg-text text-bg ring-text" : "bg-surface text-text/80 ring-line hover:bg-surface-2"
+      className={`tap h-8 shrink-0 rounded-full px-3.5 text-[13px] font-medium transition-colors duration-150 ${
+        active ? "bg-text text-bg" : "border border-line text-text-2"
       }`}
-      style={active && color ? { background: color, color: "#0c0b10", boxShadow: `0 0 0 1px ${color}` } : undefined}
     >
       {children}
     </button>

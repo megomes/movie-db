@@ -1,46 +1,40 @@
 @import "tailwindcss";
 
+/* Design system "Cinematic Streaming": preto, arte como protagonista, UI discreta */
 :root {
   color-scheme: dark;
-  --bg: #0c0b10;
-  --surface: #16151c;
-  --surface-2: #201e29;
-  --line: rgb(255 255 255 / 0.08);
-  --text: #f3f1f7;
-  --muted: #8e8a9a;
-  --accent: #ffcc4d;
-  --accent-ink: #1a1405;
-
-  --c-movie: #ff7a6b;
-  --c-series: #a78bfa;
-  --c-game: #34d399;
-  --c-book: #f5a524;
-
-  --ok: #34d399;
-  --info: #60a5fa;
-  --warn: #fbbf24;
-  --danger: #f87171;
+  --bg: #070707;
+  --bg-2: #111111;
+  --bg-3: #1a1a1a;
+  --text: #f5f5f5;
+  --text-2: #a0a0a0;
+  --text-3: #6f6f6f;
+  --line: rgb(255 255 255 / 0.12);
+  --overlay: rgb(0 0 0 / 0.55);
+  --overlay-soft: rgb(0 0 0 / 0.3);
+  --success: #67d87a;
+  --danger: #ff4b32;
+  --neutral: #6b6b6b;
+  --pill: #626262;
+  --glass: rgb(120 120 120 / 0.55);
+  --nav: rgb(20 20 20 / 0.95);
 }
 
 @theme inline {
   --color-bg: var(--bg);
-  --color-surface: var(--surface);
-  --color-surface-2: var(--surface-2);
-  --color-line: var(--line);
+  --color-bg-2: var(--bg-2);
+  --color-bg-3: var(--bg-3);
   --color-text: var(--text);
-  --color-muted: var(--muted);
-  --color-accent: var(--accent);
-  --color-accent-ink: var(--accent-ink);
-  --color-movie: var(--c-movie);
-  --color-series: var(--c-series);
-  --color-game: var(--c-game);
-  --color-book: var(--c-book);
-  --color-ok: var(--ok);
-  --color-info: var(--info);
-  --color-warn: var(--warn);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+  --color-line: var(--line);
+  --color-success: var(--success);
   --color-danger: var(--danger);
+  --color-neutral: var(--neutral);
+  --color-pill: var(--pill);
+  --color-glass: var(--glass);
+  --color-nav: var(--nav);
   --font-sans: var(--font-geist-sans);
-  --font-display: var(--font-display);
 }
 
 html,
@@ -55,11 +49,6 @@ body {
   overscroll-behavior-y: none;
 }
 
-.font-display {
-  font-family: var(--font-display), var(--font-geist-sans), sans-serif;
-  letter-spacing: -0.02em;
-}
-
 .no-scrollbar {
   scrollbar-width: none;
 }
@@ -68,36 +57,34 @@ body {
 }
 
 .pb-nav {
-  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
 }
 
-@keyframes reel-pop {
-  0% {
-    transform: scale(0.92) translateY(6px);
-    opacity: 0.6;
-  }
-  60% {
-    transform: scale(1.04);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-.reel-pop {
-  animation: reel-pop 380ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+/* Degradê do hero: arte limpa em cima, funde no preto embaixo */
+.hero-fade {
+  background: linear-gradient(to bottom, rgb(0 0 0 / 0.35) 0%, rgb(0 0 0 / 0.05) 22%, rgb(0 0 0 / 0.05) 45%, rgb(7 7 7 / 0.65) 75%, #070707 100%);
 }
 
-@keyframes rise {
+.press {
+  transition:
+    transform 150ms ease-out,
+    opacity 150ms ease-out;
+}
+.press:active {
+  transform: scale(0.97);
+}
+.tap:active {
+  opacity: 0.75;
+}
+
+@keyframes fade-in {
   from {
-    transform: translateY(8px);
     opacity: 0;
   }
   to {
-    transform: none;
     opacity: 1;
   }
 }
-.rise {
-  animation: rise 260ms ease-out both;
+.fade-in {
+  animation: fade-in 220ms ease-out both;
 }

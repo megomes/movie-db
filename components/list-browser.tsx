@@ -1,13 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, Shuffle } from "lucide-react";
+import { Search, Shuffle, X } from "lucide-react";
 import type { Kind } from "@/lib/db/schema";
 import { normalize } from "@/lib/sources/http";
 import { accessFor, KIND_META, KINDS } from "@/lib/kinds";
 import type { LiteItem } from "@/lib/queries";
 import { Chip } from "./chip";
-import { ItemCard } from "./item-card";
+import { Poster } from "./item-card";
 
 const SORTS = [
   { id: "score", label: "Nota" },
@@ -18,13 +18,23 @@ const SORTS = [
 ] as const;
 type SortId = (typeof SORTS)[number]["id"];
 
-type Filter = "mine" | "want" | "switch" | "pc" | "sale";
+const FILTERS = ["mine", "want", "switch", "pc", "sale"] as const;
+type Filter = (typeof FILTERS)[number];
 
-
-export function ListBrowser({ items, myProviders, userId }: { items: LiteItem[]; myProviders: number[]; userId: string }) {
-  const [kind, setKind] = useState<Kind | "all">("all");
-  const [sort, setSort] = useState<SortId>("score");
-  const [filters, setFilters] = useState<Set<Filter>>(new Set());
+export function ListBrowser({
+  items,
+  myProviders,
+  userId,
+  initial,
+}: {
+  items: LiteItem[];
+  myProviders: number[];
+  userId: string;
+  initial: { kind?: string; filter?: string; sort?: string };
+}) {
+  const [kind, setKind] = useState<Kind | "all">(KINDS.includes(initial.kind as Kind) ? (initial.kind as Kind) : "all");
+  const [sort, setSort] = useState<SortId>(SORTS.some((s) => s.id === initial.sort) ? (initial.sort as SortId) : "score");
+  const [filters, setFilters] = useState<Set<Filter>>(new Set(FILTERS.includes(initial.filter as Filter) ? [initial.filter as Filter] : []));
   const [q, setQ] = useState("");
   const [seed, setSeed] = useState(1);
 
@@ -69,7 +79,6 @@ export function ListBrowser({ items, myProviders, userId }: { items: LiteItem[];
         list = [...list].sort((a, b) => a.title.localeCompare(b.title, "pt-BR"));
         break;
       case "shuffle": {
-        // Embaralha de forma estável para o mesmo seed
         const h = (s: string) => [...s].reduce((acc, ch) => (acc * 31 + ch.charCodeAt(0) + seed) | 0, seed);
         list = [...list].sort((a, b) => h(a.id) - h(b.id));
         break;
@@ -78,26 +87,31 @@ export function ListBrowser({ items, myProviders, userId }: { items: LiteItem[];
     return list;
   }, [items, kind, q, filters, sort, myProviders, userId, seed]);
 
-  const showGameFilters = kind === "game" || kind === "all";
-  const showAvFilters = kind === "movie" || kind === "series" || kind === "all";
+  const showGame = kind === "game" || kind === "all";
+  const showAv = kind === "movie" || kind === "series" || kind === "all";
 
   return (
     <div>
-      <div className="sticky top-0 z-30 border-b border-line bg-bg/85 px-4 pb-3 pt-4 backdrop-blur-xl">
-        <div className="flex items-center gap-2">
+      <div className="sticky top-0 z-30 bg-bg/90 pb-3 pt-[calc(env(safe-area-inset-top)+16px)] backdrop-blur-xl">
+        <div className="flex items-center gap-2 px-4">
           <div className="relative flex-1">
-            <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+            <Search size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-3" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Buscar na lista, autor, gênero…"
-              className="w-full rounded-xl bg-surface py-2.5 pl-9 pr-3 text-sm outline-none ring-1 ring-line placeholder:text-muted focus:ring-accent/60"
+              placeholder="Título, autor, gênero"
+              className="h-10 w-full rounded-full bg-bg-3 pl-9 pr-9 text-[15px] outline-none placeholder:text-text-3"
             />
+            {q && (
+              <button onClick={() => setQ("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-3" aria-label="Limpar">
+                <X size={16} />
+              </button>
+            )}
           </div>
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as SortId)}
-            className="rounded-xl bg-surface px-3 py-2.5 text-sm outline-none ring-1 ring-line"
+            className="h-10 rounded-full bg-bg-3 px-3.5 text-sm text-text-2 outline-none"
             aria-label="Ordenar"
           >
             {SORTS.map((s) => (
@@ -107,31 +121,30 @@ export function ListBrowser({ items, myProviders, userId }: { items: LiteItem[];
             ))}
           </select>
           {sort === "shuffle" && (
-            <button onClick={() => setSeed((s) => s + 1)} className="rounded-xl bg-surface p-2.5 ring-1 ring-line" aria-label="Embaralhar de novo">
-              <Shuffle size={18} />
+            <button onClick={() => setSeed((s) => s + 1)} className="tap flex h-10 w-10 items-center justify-center rounded-full bg-bg-3" aria-label="Embaralhar de novo">
+              <Shuffle size={17} />
             </button>
           )}
         </div>
-        <div className="no-scrollbar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4">
+        <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto px-4">
           <Chip active={kind === "all"} onClick={() => setKind("all")}>
-            Tudo <span className="opacity-60">{counts.all}</span>
+            Tudo <span className="opacity-50">{counts.all}</span>
           </Chip>
           {KINDS.map((k) => (
-            <Chip key={k} active={kind === k} onClick={() => setKind(k)} color={KIND_META[k].color}>
-              {KIND_META[k].plural} <span className="opacity-60">{counts[k] ?? 0}</span>
+            <Chip key={k} active={kind === k} onClick={() => setKind(k)}>
+              {KIND_META[k].plural} <span className="opacity-50">{counts[k] ?? 0}</span>
             </Chip>
           ))}
-        </div>
-        <div className="no-scrollbar -mx-4 mt-2 flex gap-2 overflow-x-auto px-4">
+          <span className="mx-1 w-px shrink-0 bg-line" />
           <Chip active={filters.has("want")} onClick={() => toggle("want")}>
-            ♥ Eu quero
+            Eu quero
           </Chip>
-          {showAvFilters && (
-            <Chip active={filters.has("mine")} onClick={() => toggle("mine")} color="var(--ok)">
+          {showAv && (
+            <Chip active={filters.has("mine")} onClick={() => toggle("mine")}>
               No meu streaming
             </Chip>
           )}
-          {showGameFilters && (
+          {showGame && (
             <>
               <Chip active={filters.has("switch")} onClick={() => toggle("switch")}>
                 Switch
@@ -139,7 +152,7 @@ export function ListBrowser({ items, myProviders, userId }: { items: LiteItem[];
               <Chip active={filters.has("pc")} onClick={() => toggle("pc")}>
                 PC
               </Chip>
-              <Chip active={filters.has("sale")} onClick={() => toggle("sale")} color="var(--warn)">
+              <Chip active={filters.has("sale")} onClick={() => toggle("sale")}>
                 Em promoção
               </Chip>
             </>
@@ -147,12 +160,12 @@ export function ListBrowser({ items, myProviders, userId }: { items: LiteItem[];
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-x-3 gap-y-5 px-4 pt-4 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
-        {visible.map((i) => (
-          <ItemCard key={i.id} item={i} myProviders={myProviders} showKind={kind === "all"} />
+      <div className="grid grid-cols-3 gap-2 px-4 pt-1 sm:grid-cols-4 md:grid-cols-6">
+        {visible.map((i, idx) => (
+          <Poster key={i.id} item={i} myProviders={myProviders} eager={idx < 9} />
         ))}
       </div>
-      {!visible.length && <p className="px-4 py-16 text-center text-sm text-muted">Nada por aqui com esses filtros.</p>}
+      {!visible.length && <p className="px-4 py-16 text-center text-sm text-text-2">Nada por aqui com esses filtros.</p>}
     </div>
   );
 }

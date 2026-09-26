@@ -1,29 +1,24 @@
+/* eslint-disable @next/next/no-img-element -- arte externa */
 "use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Dices } from "lucide-react";
+import { Dices, Search } from "lucide-react";
 import type { Kind } from "@/lib/db/schema";
-import { accessFor, formatMinutes, KIND_META, KINDS, scoreLabel, TIER_COLOR } from "@/lib/kinds";
+import { accessFor, formatMinutes, KIND_META, KINDS, scoreLabel } from "@/lib/kinds";
 import type { LiteItem } from "@/lib/queries";
 import { Chip } from "./chip";
-import { Cover } from "./cover";
+import { GlassButton } from "./glass-button";
+import { Poster } from "./item-card";
 
 const TIMES = [
-  { id: "any", label: "Tanto faz", max: Infinity },
+  { id: "any", label: "Qualquer tempo", max: Infinity },
   { id: "short", label: "Até 1h40", max: 100 },
   { id: "evening", label: "Uma noite", max: 150 },
   { id: "weekend", label: "Um fim de semana", max: 900 },
 ] as const;
-
-const COMPANY = [
-  { id: "any", label: "Tanto faz" },
-  { id: "me", label: "Só eu" },
-  { id: "together", label: "Juntos" },
-] as const;
-
 type TimeId = (typeof TIMES)[number]["id"];
-type CompanyId = (typeof COMPANY)[number]["id"];
+type Company = "any" | "me" | "together";
 
 function weightOf(i: LiteItem, userId: string) {
   let w = Math.max(0.5, ((i.score ?? 6.5) - 4) ** 2);
@@ -44,21 +39,41 @@ function drawWeighted(pool: LiteItem[], n: number, userId: string) {
   return out;
 }
 
-export function Tonight({ items, myProviders, userId }: { items: LiteItem[]; myProviders: number[]; userId: string }) {
+function preload(src: string | null) {
+  if (!src) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    const img = new Image();
+    img.onload = img.onerror = () => resolve();
+    img.src = src;
+  });
+}
+
+export function Tonight({
+  items,
+  myProviders,
+  userId,
+  userImage,
+  initialIds,
+}: {
+  items: LiteItem[];
+  myProviders: number[];
+  userId: string;
+  userImage: string | null;
+  initialIds: string[];
+}) {
   const [kind, setKind] = useState<Kind | "any">("any");
   const [time, setTime] = useState<TimeId>("any");
-  const [company, setCompany] = useState<CompanyId>("any");
+  const [company, setCompany] = useState<Company>("any");
   const [onlyMine, setOnlyMine] = useState(false);
-  const [picks, setPicks] = useState<LiteItem[]>([]);
-  const [spinning, setSpinning] = useState<boolean[]>([false, false, false]);
-  const [reelFaces, setReelFaces] = useState<(LiteItem | null)[]>([null, null, null]);
-  const timers = useRef<ReturnType<typeof setInterval>[]>([]);
+  const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+  const [picks, setPicks] = useState<LiteItem[]>(() => initialIds.map((id) => byId.get(id)!).filter(Boolean));
+  const [shuffling, setShuffling] = useState(false);
+  const cancel = useRef(false);
 
   const pool = useMemo(() => {
     const max = TIMES.find((t) => t.id === time)!.max;
     return items.filter((i) => {
       if (kind !== "any" && i.kind !== kind) return false;
-      // Livro não tem "tempo de uma noite"; séries contam o total de episódios
       if (max !== Infinity && (i.kind === "book" || !i.minutes || i.minutes > max)) return false;
       if (onlyMine && (i.kind === "movie" || i.kind === "series") && accessFor(i, myProviders).tier !== "mine") return false;
       if (company === "me" && i.interestedIds.length > 0 && !i.interestedIds.includes(userId)) return false;
@@ -67,151 +82,138 @@ export function Tonight({ items, myProviders, userId }: { items: LiteItem[]; myP
     });
   }, [items, kind, time, company, onlyMine, myProviders, userId]);
 
-  useEffect(() => () => timers.current.forEach(clearInterval), []);
+  useEffect(() => () => void (cancel.current = true), []);
 
-  // A roleta gira só entre capas já carregadas; as escolhidas são pré-carregadas no clique
-  const preloaded = useRef(new Map<string, LiteItem>());
-  const preload = (list: LiteItem[]) => {
-    for (const i of list) {
-      if (!i.coverUrl || preloaded.current.has(i.id)) continue;
-      const img = new Image();
-      img.onload = () => preloaded.current.set(i.id, i);
-      img.src = i.coverUrl;
+  // Sorteia: passa rapidamente por algumas artes (crossfade) e pousa no escolhido
+  async function spin() {
+    if (!pool.length || shuffling) return;
+    setShuffling(true);
+    const chosen = drawWeighted(pool, 9, userId);
+    const teasers = drawWeighted(pool.filter((i) => i.coverUrl), 4, userId);
+    await Promise.all([preload(chosen[0]?.coverUrl ?? null), preload(chosen[0]?.backdropUrl ?? null), ...teasers.map((t) => preload(t.coverUrl))]);
+    for (const t of teasers) {
+      if (cancel.current) return;
+      setPicks([t]);
+      await new Promise((r) => setTimeout(r, 170));
     }
-  };
-  useEffect(() => {
-    const withCover = items.filter((i) => i.coverUrl);
-    preload([...withCover].sort(() => Math.random() - 0.5).slice(0, 18));
-  }, [items]);
-
-  function spin() {
-    if (!pool.length) return;
-    timers.current.forEach(clearInterval);
-    const chosen = drawWeighted(pool, 3, userId);
-    preload(chosen);
     setPicks(chosen);
-    setSpinning([true, true, true]);
-    const ready = [...preloaded.current.values()];
-    const faces = ready.length >= 4 ? ready : pool;
-    timers.current = [0, 1, 2].map((reel) => {
-      const t = setInterval(() => {
-        setReelFaces((prev) => {
-          const next = [...prev];
-          next[reel] = faces[Math.floor(Math.random() * faces.length)];
-          return next;
-        });
-      }, 85);
-      setTimeout(() => {
-        clearInterval(t);
-        setReelFaces((prev) => {
-          const next = [...prev];
-          next[reel] = chosen[reel] ?? null;
-          return next;
-        });
-        setSpinning((prev) => {
-          const next = [...prev];
-          next[reel] = false;
-          return next;
-        });
-      }, 700 + reel * 380);
-      return t;
-    });
-    if ("vibrate" in navigator) navigator.vibrate?.(15);
+    setShuffling(false);
+    navigator.vibrate?.(12);
   }
 
-  const done = picks.length > 0 && spinning.every((s) => !s);
+  const hero = picks[0];
+  const more = picks.slice(1);
 
   return (
-    <section className="mt-6 rounded-3xl bg-surface p-4 ring-1 ring-line sm:p-5">
-      <div className="space-y-3">
-        <Row label="O quê">
+    <>
+      <section className="relative h-[64svh] min-h-[440px] w-full overflow-hidden md:h-[70vh]">
+        {hero && (
+          <div key={hero.id} className="fade-in absolute inset-0">
+            {/* retrato no celular, paisagem no desktop */}
+            {hero.coverUrl && <img src={hero.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover md:hidden" />}
+            {(hero.backdropUrl ?? hero.coverUrl) && (
+              <img src={(hero.backdropUrl ?? hero.coverUrl)!} alt="" className="absolute inset-0 hidden h-full w-full object-cover md:block" />
+            )}
+          </div>
+        )}
+        <div className="hero-fade absolute inset-0" />
+
+        <div className="absolute inset-x-0 top-0 flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top)+12px)]">
+          <Link href="/ajustes" className="tap h-10 w-10 overflow-hidden rounded-full bg-glass backdrop-blur-md" aria-label="Ajustes">
+            {userImage && <img src={userImage} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" />}
+          </Link>
+          <GlassButton href="/lista" label="Buscar">
+            <Search size={20} />
+          </GlassButton>
+        </div>
+
+        {hero && (
+          <div key={`meta-${hero.id}`} className="fade-in absolute inset-x-0 bottom-0 flex flex-col items-center px-4 pb-5 text-center">
+            <HeroMeta item={hero} myProviders={myProviders} />
+            <div className="mt-4 flex items-center gap-2.5">
+              <button
+                onClick={spin}
+                disabled={shuffling || !pool.length}
+                className="tap flex h-10 items-center gap-2 rounded-full bg-pill px-5 text-[15px] font-medium text-white disabled:opacity-60"
+              >
+                <Dices size={18} className={shuffling ? "animate-spin" : ""} /> Sortear
+              </button>
+              <Link href={`/item/${hero.id}`} className="tap flex h-10 items-center rounded-full border border-white/80 px-5 text-[15px] font-medium">
+                Detalhes
+              </Link>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <div className="space-y-2 pt-2">
+        <div className="no-scrollbar flex gap-2 overflow-x-auto px-4">
           <Chip active={kind === "any"} onClick={() => setKind("any")}>
-            Tanto faz
+            Tudo
           </Chip>
           {KINDS.map((k) => (
-            <Chip key={k} active={kind === k} onClick={() => setKind(k)} color={KIND_META[k].color}>
-              {KIND_META[k].label}
+            <Chip key={k} active={kind === k} onClick={() => setKind(k)}>
+              {KIND_META[k].plural}
             </Chip>
           ))}
-        </Row>
-        <Row label="Tempo">
+        </div>
+        <div className="no-scrollbar flex gap-2 overflow-x-auto px-4">
           {TIMES.map((t) => (
             <Chip key={t.id} active={time === t.id} onClick={() => setTime(t.id)}>
               {t.label}
             </Chip>
           ))}
-        </Row>
-        <Row label="Com quem">
-          {COMPANY.map((c) => (
-            <Chip key={c.id} active={company === c.id} onClick={() => setCompany(c.id)}>
-              {c.label}
-            </Chip>
-          ))}
-          <Chip active={onlyMine} onClick={() => setOnlyMine((v) => !v)} color="var(--ok)">
-            Só no meu streaming
+          <Chip active={company === "me"} onClick={() => setCompany((c) => (c === "me" ? "any" : "me"))}>
+            Só eu
           </Chip>
-        </Row>
+          <Chip active={company === "together"} onClick={() => setCompany((c) => (c === "together" ? "any" : "together"))}>
+            Juntos
+          </Chip>
+          <Chip active={onlyMine} onClick={() => setOnlyMine((v) => !v)}>
+            No meu streaming
+          </Chip>
+        </div>
+        <p className="px-4 pt-1 text-xs text-text-3">
+          {pool.length ? `${pool.length} opções · nota alta tem mais chance` : "Nada com esses filtros."}
+        </p>
       </div>
 
-      <div className="mt-5 grid grid-cols-3 gap-2.5 sm:gap-4">
-        {[0, 1, 2].map((reel) => {
-          const face = reelFaces[reel];
-          const settled = !spinning[reel] && picks[reel];
-          return (
-            <div key={reel} className="min-w-0">
-              <div className={`overflow-hidden rounded-xl ${spinning[reel] ? "blur-[1.5px] brightness-75" : ""} ${settled ? "reel-pop" : ""}`}>
-                {face ? (
-                  <Link href={settled ? `/item/${face.id}` : "#"} aria-disabled={!settled} tabIndex={settled ? 0 : -1}>
-                    <Cover src={face.coverUrl} title={face.title} kind={face.kind} eager />
-                  </Link>
-                ) : (
-                  <div className="flex aspect-[2/3] items-center justify-center rounded-xl border border-dashed border-line text-3xl text-muted/40">
-                    ?
-                  </div>
-                )}
+      {more.length > 0 && !shuffling && (
+        <section className="fade-in mt-6">
+          <h2 className="mb-3 px-4 text-[20px] font-semibold leading-tight">Também sorteados</h2>
+          <div className="no-scrollbar flex gap-2 overflow-x-auto px-4">
+            {more.map((i) => (
+              <div key={i.id} className="w-[120px] shrink-0">
+                <Poster item={i} myProviders={myProviders} />
               </div>
-              {settled && face && <PickMeta item={face} myProviders={myProviders} />}
-            </div>
-          );
-        })}
-      </div>
-
-      <button
-        type="button"
-        onClick={spin}
-        disabled={!pool.length || spinning.some(Boolean)}
-        className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-accent py-3.5 font-display text-lg font-extrabold text-accent-ink shadow-lg shadow-accent/15 transition active:scale-[0.98] disabled:opacity-50"
-      >
-        <Dices size={22} strokeWidth={2.4} />
-        {done ? "Sortear de novo" : "Sortear"}
-      </button>
-      <p className="mt-2 text-center text-xs text-muted">
-        {pool.length ? `${pool.length} opções com esses filtros · nota alta pesa mais` : "Nada com esses filtros. Afrouxa um pouco."}
-      </p>
-    </section>
+            ))}
+          </div>
+        </section>
+      )}
+    </>
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted">{label}</p>
-      <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">{children}</div>
-    </div>
-  );
-}
-
-function PickMeta({ item, myProviders }: { item: LiteItem; myProviders: number[] }) {
+function HeroMeta({ item, myProviders }: { item: LiteItem; myProviders: number[] }) {
   const access = accessFor(item, myProviders);
   const score = scoreLabel(item);
   const length = item.kind === "book" ? (item.pages ? `${item.pages} pág.` : null) : formatMinutes(item.minutes, item.kind);
   return (
-    <div className="rise mt-2 px-0.5">
-      <p className="text-[13px] font-semibold leading-tight line-clamp-2">{item.title}</p>
-      <p className="mt-1 text-[11px] text-muted">{[score && `★ ${score.value}`, length].filter(Boolean).join(" · ")}</p>
-      <p className="mt-0.5 flex items-center gap-1 text-[11px]" style={{ color: TIER_COLOR[access.tier] }}>
-        <span className="truncate">{access.label}</span>
+    <>
+      <p className="text-xs font-medium uppercase tracking-[0.14em] text-text-2">{KIND_META[item.kind].label}</p>
+      <h1 className="mt-1.5 max-w-md text-[26px] font-semibold leading-tight text-balance line-clamp-2">{item.title}</h1>
+      <p className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[13px] text-text-2">
+        {score && (
+          <span className="font-medium text-success">
+            {score.source} {score.value}
+          </span>
+        )}
+        {item.year && <span>{item.year}</span>}
+        {length && <span>{length}</span>}
+        {access.tier !== "unknown" && item.kind !== "book" && (
+          <span className={access.tier === "mine" ? "text-success" : ""}>{access.label}</span>
+        )}
       </p>
-    </div>
+    </>
   );
 }
