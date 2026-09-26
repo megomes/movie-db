@@ -359,7 +359,7 @@ export function ItemTags({ itemId, kind, title, cover, tagIds, editable }: { ite
   );
 }
 
-export function ItemMenu({ itemId }: { itemId: string }) {
+export function ItemMenu({ itemId, shared = false }: { itemId: string; shared?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
@@ -395,14 +395,14 @@ export function ItemMenu({ itemId }: { itemId: string }) {
               <button
                 className={`${row} text-danger`}
                 onClick={() => {
-                  if (confirm("Remover do backlog? (é tirar porque não quer mais, não “já vi”)"))
+                  if (confirm(shared ? "Remover da lista? Some pra todo mundo." : "Remover do backlog? (é tirar porque não quer mais, não “já vi”)"))
                     start(async () => {
                       await deleteItem(itemId);
-                      router.push("/lista");
+                      router.push(shared ? "/lista?k=book" : "/lista");
                     });
                 }}
               >
-                <Trash2 size={17} /> Remover do backlog
+                <Trash2 size={17} /> {shared ? "Remover da lista" : "Remover do backlog"}
               </button>
             </motion.div>
           </>

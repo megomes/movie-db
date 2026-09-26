@@ -1,6 +1,7 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { PageHeader } from "@/components/page-header";
 import { ReviewStack } from "@/components/review-stack";
+import { COLLECTIONS } from "@/lib/collections";
 import { db, items } from "@/lib/db";
 import { listReviewItems } from "@/lib/queries";
 import { requireUser } from "@/lib/session";
@@ -12,7 +13,7 @@ export default async function ReviewPage({ searchParams }: PageProps<"/revisar">
   const { item: only } = await searchParams;
   const single = typeof only === "string" && /^[0-9a-f-]{36}$/i.test(only);
   const rows = single
-    ? await db.select().from(items).where(and(eq(items.id, only), eq(items.ownerId, user.id)))
+    ? await db.select().from(items).where(and(eq(items.id, only), inArray(items.ownerId, [user.id, ...Object.keys(COLLECTIONS)])))
     : await listReviewItems(user.id);
 
   return (

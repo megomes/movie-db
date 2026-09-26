@@ -1,5 +1,6 @@
 import { AddSearch } from "@/components/add-search";
 import { PageHeader } from "@/components/page-header";
+import { COLLECTIONS, FELIPE } from "@/lib/collections";
 import { KINDS } from "@/lib/kinds";
 
 export const metadata = { title: "Adicionar" };
@@ -22,12 +23,18 @@ export default async function AddPage({ searchParams }: PageProps<"/adicionar">)
       .trim();
   const k = KINDS.find((x) => x === one(sp.k));
   const initialKind = steamTitle ? "game" : (k ?? "any");
+  // ?para=felipe: adiciona na lista compartilhada em vez do backlog pessoal
+  const collection = one(sp.para) === "felipe" ? FELIPE : undefined;
 
   return (
     <div className="mx-auto max-w-[1400px]">
-      <PageHeader title="Adicionar" subtitle="Filmes, séries, jogos e livros numa busca só." />
+      {collection ? (
+        <PageHeader title={COLLECTIONS[collection].title} subtitle="Busque no Google Books. O que entrar aparece pra todo mundo." />
+      ) : (
+        <PageHeader title="Adicionar" subtitle="Filmes, séries, jogos e livros numa busca só." />
+      )}
       <div className="px-4 sm:px-6 lg:px-10">
-        <AddSearch initialQuery={initialQuery} initialKind={initialKind} imdbId={imdbId} />
+        <AddSearch initialQuery={initialQuery} initialKind={collection ? "book" : initialKind} imdbId={collection ? null : imdbId} collection={collection} />
       </div>
     </div>
   );

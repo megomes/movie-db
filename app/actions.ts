@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db, items, profiles, pushSubscriptions, tags, type Kind } from "@/lib/db";
 import { requireUser } from "@/lib/session";
+import { isShared } from "@/lib/collections";
 import { enrich } from "@/lib/enrich";
 import { findByImdbId } from "@/lib/sources/tmdb";
 
@@ -18,11 +19,11 @@ function refresh(id?: string) {
   if (id) revalidatePath(`/item/${id}`);
 }
 
-// Só o dono mexe no próprio backlog
+// Só o dono mexe no próprio backlog; listas compartilhadas qualquer pessoa com acesso edita
 async function own(itemId: string) {
   const user = await requireUser();
-  const [row] = await db.select().from(items).where(and(eq(items.id, itemId), eq(items.ownerId, user.id)));
-  if (!row) throw new Error("Item não encontrado no seu backlog");
+  const [row] = await db.select().from(items).where(eq(items.id, itemId));
+  if (!row || (row.ownerId !== user.id && !isShared(row.ownerId))) throw new Error("Item não encontrado no seu backlog");
   return { user, item: row };
 }
 
@@ -71,13 +72,16 @@ async function validTags(ownerId: string, kind: Kind, tagIds: string[]) {
 const legacyFields = (kind: Kind, names: string[]) =>
   kind === "game" ? { myPlatforms: names } : kind === "book" ? { category: names[0] ?? null } : {};
 
-export async function addItem(kind: string, externalId: string, tagIds: string[] = []) {
+// collection: adiciona numa lista compartilhada (ex.: Livros para o Felipe) em vez do seu backlog
+export async function addItem(kind: string, externalId: string, tagIds: string[] = [], collection?: string) {
   const user = await requireUser();
   const k = assertKind(kind);
-  const [data, t] = await Promise.all([enrich(k, externalId), validTags(user.id, k, tagIds)]);
+  if (collection && !isShared(collection)) throw new Error("Lista inválida");
+  const ownerId = collection ?? user.id;
+  const [data, t] = await Promise.all([enrich(k, externalId), validTags(ownerId, k, collection ? [] : tagIds)]);
   const [row] = await db
     .insert(items)
-    .values({ title: "", ...data, kind: k, ownerId: user.id, source: "manual", matchStatus: "matched", tagIds: t.tagIds, ...legacyFields(k, t.names) })
+    .values({ title: "", ...data, kind: k, ownerId, source: "manual", matchStatus: "matched", tagIds: t.tagIds, ...legacyFields(k, t.names) })
     .returning({ id: items.id });
   refresh();
   return row.id;

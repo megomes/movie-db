@@ -46,8 +46,20 @@ export function useSearch(kind: Kind | "any", query: string) {
   return { results: active ? results : [], loading: active && loading, error: active ? error : null };
 }
 
-export function AddSearch({ initialQuery, initialKind, imdbId }: { initialQuery: string; initialKind: Kind | "any"; imdbId: string | null }) {
-  const { items } = useBacklog();
+export function AddSearch({
+  initialQuery,
+  initialKind,
+  imdbId,
+  collection,
+}: {
+  initialQuery: string;
+  initialKind: Kind | "any";
+  imdbId: string | null;
+  /** Lista compartilhada de destino (ex.: Livros para o Felipe): sem tags, só livros */
+  collection?: string;
+}) {
+  const { items: mine, felipe } = useBacklog();
+  const items = collection ? felipe : mine;
   const [kind, setKind] = useState<Kind | "any">(initialKind);
   const [query, setQuery] = useState(initialQuery);
   const [status, setStatus] = useState<Record<string, "adding" | string>>({});
@@ -57,10 +69,23 @@ export function AddSearch({ initialQuery, initialKind, imdbId }: { initialQuery:
   // Marca o que já está no backlog (pelo título + ano)
   const owned = useMemo(() => new Set(items.map((i) => `${normalize(i.title)}|${i.year ?? ""}`)), [items]);
 
-  // Sempre pergunta a tag quando a divisão tem tags
+  // Sempre pergunta a tag quando a divisão tem tags (lista compartilhada não tem tags)
   const add = useCallback(
     (r: Result) => {
       const key = `${r.kind}:${r.externalId}`;
+      if (collection) {
+        setStatus((s) => ({ ...s, [key]: "adding" }));
+        addItem(r.kind, r.externalId, [], collection).then(
+          (id) => setStatus((s) => ({ ...s, [key]: id })),
+          () =>
+            setStatus((s) => {
+              const next = { ...s };
+              delete next[key];
+              return next;
+            }),
+        );
+        return;
+      }
       ask({
         kind: r.kind,
         title: r.title,
@@ -82,7 +107,7 @@ export function AddSearch({ initialQuery, initialKind, imdbId }: { initialQuery:
         },
       });
     },
-    [ask],
+    [ask, collection],
   );
 
   return (
@@ -119,7 +144,7 @@ export function AddSearch({ initialQuery, initialKind, imdbId }: { initialQuery:
           autoFocus={!imdbId}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Filme, série, jogo ou livro…"
+          placeholder={collection ? "Título ou autor do livro…" : "Filme, série, jogo ou livro…"}
           className="h-full flex-1 bg-transparent pl-3 text-[17px] outline-none placeholder:text-text-3"
         />
         {loading ? (
@@ -133,6 +158,7 @@ export function AddSearch({ initialQuery, initialKind, imdbId }: { initialQuery:
         )}
       </div>
 
+      {!collection && (
       <div className="glass no-scrollbar mt-3 inline-flex max-w-full gap-1 overflow-x-auto rounded-full p-1">
         {(["any", ...KINDS] as const).map((k) => (
           <button key={k} onClick={() => setKind(k)} className="relative shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium">
@@ -141,6 +167,7 @@ export function AddSearch({ initialQuery, initialKind, imdbId }: { initialQuery:
           </button>
         ))}
       </div>
+      )}
 
       {error && <p className="mt-4 text-sm text-danger">{error}</p>}
 
@@ -151,7 +178,7 @@ export function AddSearch({ initialQuery, initialKind, imdbId }: { initialQuery:
         })}
       </div>
       {!loading && query.trim().length >= 2 && !results.length && !error && <p className="mt-10 text-center text-text-2">Nada encontrado.</p>}
-      {query.trim().length < 2 && <p className="mt-10 text-center text-[14px] text-text-3">Dica: no Android, compartilhe um link do IMDb ou da Steam direto para o app.</p>}
+      {query.trim().length < 2 && !collection && <p className="mt-10 text-center text-[14px] text-text-3">Dica: no Android, compartilhe um link do IMDb ou da Steam direto para o app.</p>}
     </div>
   );
 }
@@ -190,3 +217,4 @@ const ResultCard = memo(function ResultCard({ r, idx, st, already, onAdd }: { r:
     </motion.div>
   );
 });
+
