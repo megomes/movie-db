@@ -19,6 +19,8 @@ export async function analyzeCover(url: string | null | undefined): Promise<Cove
     const img = sharp(buf);
     const meta = await img.metadata();
     if (!meta.width || meta.width < 60) return null;
+    // Capas reais do Google são JPEG; o "image not available" é um PNG quase branco
+    if (src.includes("books.google.") && meta.format === "png") return null;
     const { dominant } = await img.stats();
     // Escurece um pouco a cor para funcionar como luz ambiente sobre fundo preto
     const color = `#${hex(dominant.r * 0.85)}${hex(dominant.g * 0.85)}${hex(dominant.b * 0.85)}`;

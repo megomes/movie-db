@@ -57,20 +57,30 @@ function TopBar() {
   return (
     <header className="fixed inset-x-0 top-0 z-40 hidden px-6 pt-4 lg:block">
       <div
-        className={`mx-auto flex h-14 max-w-[1400px] items-center justify-between gap-6 rounded-full px-3 transition-all duration-500 ${
-          scrolled ? "glass" : "border border-transparent"
-        }`}
+        className={`glass-nav mx-auto flex h-14 max-w-[1400px] items-center justify-between gap-6 rounded-full px-3 transition-shadow duration-500 ${scrolled ? "shadow-2xl" : ""}`}
       >
         <Link href="/" className="flex items-center gap-2.5 pl-1">
           <img src="/icons/icon-192.png" alt="" className="h-9 w-9 rounded-[10px]" />
           <span className="text-[17px] font-semibold tracking-tight">Backlog</span>
         </Link>
 
-        <nav className={`flex items-center gap-1 rounded-full p-1 ${scrolled ? "" : "glass"}`}>
+        <nav className="flex items-center gap-1 rounded-full bg-white/[0.04] p-1">
           {SECTIONS.map((s) => {
             const active = s.match(pathname, k);
             return (
-              <Link key={s.href} href={s.href} className="relative rounded-full px-4 py-1.5 text-[14px] font-medium">
+              <Link
+                key={s.href}
+                href={s.href}
+                onClick={(e) => {
+                  // Já na Lista: troca a divisão só no cliente (instantâneo, sem ir ao servidor nem animar a grade toda)
+                  if (pathname === "/lista" && s.href.startsWith("/lista")) {
+                    e.preventDefault();
+                    window.history.pushState(null, "", s.href);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }
+                }}
+                className="relative rounded-full px-4 py-1.5 text-[14px] font-medium"
+              >
                 {active && (
                   <motion.span layoutId="top-pill" className="btn-accent absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 34 }} />
                 )}
@@ -83,7 +93,7 @@ function TopBar() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setSearchOpen(true)}
-            className="glass tap flex h-10 items-center gap-2 rounded-full px-3.5 text-[13px] text-white/70 hover:text-white"
+            className="tap flex h-10 items-center gap-2 rounded-full bg-white/[0.06] px-3.5 text-[13px] text-white/70 hover:bg-white/10 hover:text-white"
           >
             <Search size={16} /> Buscar <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/60">Ctrl K</kbd>
           </button>
@@ -93,7 +103,7 @@ function TopBar() {
           >
             <Dices size={18} className="transition-transform duration-500 group-hover:rotate-[200deg]" /> Sortear
           </button>
-          <Link href="/adicionar" className="glass tap flex h-10 w-10 items-center justify-center rounded-full" aria-label="Adicionar">
+          <Link href="/adicionar" className="tap flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.06] hover:bg-white/10" aria-label="Adicionar">
             <Plus size={19} />
           </Link>
           <AvatarMenu />

@@ -42,6 +42,8 @@ export function toLite(i: Item) {
     coverColor: i.coverColor,
     coverBlur: i.coverBlur,
     backdropUrl: i.backdropUrl,
+    logoUrl: i.logoUrl,
+    category: i.category,
     overview: (i.summary ?? i.overview)?.slice(0, 240) ?? null,
     genres: i.genres,
     creators: i.creators,

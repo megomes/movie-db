@@ -70,8 +70,9 @@ type GameDetails = SearchGame & {
   total_rating?: number;
   aggregated_rating?: number;
   aggregated_rating_count?: number;
-  artworks?: { image_id: string }[];
+  artworks?: { image_id: string; alpha_channel?: boolean; width?: number; height?: number; artwork_type?: number }[];
   screenshots?: { image_id: string }[];
+  videos?: { video_id: string; name?: string }[];
   involved_companies?: { developer: boolean; company: { name: string } }[];
   external_games?: { uid: string; external_game_source: number }[];
 };
@@ -81,7 +82,7 @@ const SOURCE = { STEAM: 1, GAME_PASS_CLOUD: 54 };
 export async function getIgdbDetails(id: number | string): Promise<Partial<NewItem>> {
   const [g] = await igdb<GameDetails[]>(
     "games",
-    `fields name,first_release_date,summary,cover.image_id,artworks.image_id,screenshots.image_id,genres.name,platforms.abbreviation,platforms.name,total_rating,total_rating_count,aggregated_rating,aggregated_rating_count,involved_companies.developer,involved_companies.company.name,external_games.uid,external_games.external_game_source; where id = ${Number(id)};`,
+    `fields name,first_release_date,summary,cover.image_id,artworks.image_id,artworks.alpha_channel,artworks.width,artworks.height,artworks.artwork_type,screenshots.image_id,videos.video_id,videos.name,genres.name,platforms.abbreviation,platforms.name,total_rating,total_rating_count,aggregated_rating,aggregated_rating_count,involved_companies.developer,involved_companies.company.name,external_games.uid,external_games.external_game_source; where id = ${Number(id)};`,
   );
   if (!g) throw new Error(`Jogo IGDB ${id} não encontrado`);
 
@@ -92,7 +93,18 @@ export async function getIgdbDetails(id: number | string): Promise<Partial<NewIt
   const seconds = ttb?.normally ?? ttb?.hastily;
 
   const steamAppId = g.external_games?.find((e) => e.external_game_source === SOURCE.STEAM)?.uid ?? null;
-  const backdrop = g.artworks?.[0]?.image_id ?? g.screenshots?.[0]?.image_id;
+  // Arte de fundo: só artes opacas em paisagem (IGDB mistura logotipos transparentes); senão, screenshot
+  const ART_PREF = [2, 1, 4, 3];
+  const scenic = (g.artworks ?? [])
+    .filter((a) => !a.alpha_channel && (a.width ?? 0) >= 1200 && (a.width ?? 0) / (a.height ?? 1) >= 1.4 && ART_PREF.includes(a.artwork_type ?? 1))
+    .sort((a, b) => ART_PREF.indexOf(a.artwork_type ?? 1) - ART_PREF.indexOf(b.artwork_type ?? 1));
+  const backdrop = scenic[0]?.image_id ?? g.screenshots?.[0]?.image_id;
+  const logo = g.artworks?.find((a) => a.alpha_channel && a.artwork_type === 5) ?? g.artworks?.find((a) => a.alpha_channel && a.artwork_type === 7);
+  const gallery = [
+    ...(g.screenshots ?? []).slice(0, 12).map((x) => img(x.image_id, "1080p")!),
+    ...scenic.filter((a) => a.image_id !== backdrop).slice(0, 4).map((a) => img(a.image_id, "1080p")!),
+  ];
+  const trailer = (g.videos ?? []).find((v) => /trailer/i.test(v.name ?? "") && !/accolade|teaser/i.test(v.name ?? ""))?.video_id ?? g.videos?.[0]?.video_id ?? null;
 
   return {
     kind: "game",
@@ -101,6 +113,9 @@ export async function getIgdbDetails(id: number | string): Promise<Partial<NewIt
     year: year(g.first_release_date),
     coverUrl: img(g.cover?.image_id, "cover_big_2x"),
     backdropUrl: img(backdrop, "1080p"),
+    logoUrl: logo ? `https://images.igdb.com/igdb/image/upload/t_logo_med/${logo.image_id}.png` : null,
+    gallery,
+    trailer,
     overview: g.summary ?? null,
     genres: (g.genres ?? []).map((x) => x.name),
     creators: (g.involved_companies ?? []).filter((c) => c.developer).map((c) => c.company.name).slice(0, 2),

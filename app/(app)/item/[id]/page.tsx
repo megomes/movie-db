@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { CalendarDays, ChevronLeft, Clock, ExternalLink, FileText, Gamepad2, Star, Tag, Trophy } from "lucide-react";
 import { Cover } from "@/components/cover";
 import { AmbientColor, CopyButton, DoneButton, ItemMenu, NotesEditor, PinButton, PlatformToggle } from "@/components/item-actions";
+import { Gallery, TrailerButton } from "@/components/media-gallery";
+import { displayGenres } from "@/lib/genres";
 import type { Availability, CastMember, Item, Provider } from "@/lib/db/schema";
 import { artSrc, coverSrc } from "@/lib/img";
 import { accessFor, formatMinutes, KIND_META } from "@/lib/kinds";
@@ -65,111 +67,135 @@ export default async function ItemPage({ params }: PageProps<"/item/[id]">) {
   const stats = statsFor(item);
   const about = item.summary ?? item.overview;
 
+  const genres = displayGenres(item).slice(0, 4);
+
   return (
     <article className="relative">
       <AmbientColor color={item.coverColor} />
 
-      {/* Arte de fundo */}
-      <div className="absolute inset-x-0 top-0 h-[58vh] overflow-hidden lg:h-[82vh]">
-        {art ? (
-          <img src={art} alt="" className="ken-burns h-full w-full object-cover" />
-        ) : (
-          <div className="h-full w-full" style={{ backgroundColor: item.coverColor ?? "#101522" }}>
-            {item.coverUrl && <img src={coverSrc(item.coverUrl, "sm")!} alt="" className="h-full w-full scale-125 object-cover opacity-60 blur-3xl saturate-150" />}
-          </div>
-        )}
-        <div className="fade-bottom absolute inset-0" />
-        <div className="fade-left absolute inset-0 hidden lg:block" />
-      </div>
-
-      <div className="relative mx-auto max-w-[1400px] px-4 pt-[calc(env(safe-area-inset-top)+12px)] sm:px-6 lg:px-10 lg:pt-28">
-        <Link href="/lista" className="glass tap inline-flex h-10 items-center gap-1 rounded-full pl-2.5 pr-4 text-[14px]">
-          <ChevronLeft size={20} /> Voltar
-        </Link>
-
-        <div className="mt-[22vh] grid gap-7 lg:mt-[26vh] lg:grid-cols-[300px_1fr] lg:gap-12">
-          <div className="mx-auto w-[58%] max-w-[260px] lg:mx-0 lg:w-full lg:max-w-none">
-            <div className="rounded-3xl shadow-[0_30px_80px_rgb(0_0_0/0.65)]">
-              <Cover
-                item={{ id: item.id, title: item.title, kind: item.kind, coverUrl: item.coverUrl, coverColor: item.coverColor, coverBlur: item.coverBlur }}
-                size="lg"
-                morph
-                eager
-                rounded="rounded-3xl"
-              />
+      {/* Topo: arte com máscara (sem emenda) e conteúdo alinhado ao pé */}
+      <section className="relative">
+        <div className="art-mask absolute inset-x-0 top-0 h-full min-h-[62vh] overflow-hidden lg:min-h-[92vh]">
+          {art ? (
+            <img src={art} alt="" className="ken-burns h-full w-full object-cover" />
+          ) : (
+            <div className="h-full w-full" style={{ backgroundColor: item.coverColor ?? "#101522" }}>
+              {item.coverUrl && <img src={coverSrc(item.coverUrl, "sm")!} alt="" className="h-full w-full scale-125 object-cover opacity-60 blur-3xl saturate-150" />}
             </div>
-          </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-black/10 to-black/40" />
+          <div className="fade-left absolute inset-0 hidden lg:block" />
+        </div>
 
-          <div className="min-w-0 lg:pt-10">
-            {!mine && owner && <p className="mb-2 text-[13px] font-medium text-accent-2">Do backlog de {owner.name?.split(" ")[0]}</p>}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="glass rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]">{KIND_META[item.kind].label}</span>
-              {[item.category, ...item.genres.slice(0, 3)].filter(Boolean).map((g) => (
-                <span key={g} className="rounded-full border border-white/15 px-3 py-1 text-[12px] text-white/75">
-                  {g}
-                </span>
-              ))}
-            </div>
-            <h1 className="mt-4 text-[34px] font-bold leading-[1.02] tracking-tight lg:text-[60px]">{item.title}</h1>
-            {item.originalTitle && item.originalTitle !== item.title && <p className="mt-1.5 text-[15px] text-white/55">{item.originalTitle}</p>}
-            {item.creators.length > 0 && <p className="mt-2 text-[15px] text-white/75">{item.creators.slice(0, 3).join(", ")}</p>}
+        <div className="relative mx-auto max-w-[1400px] px-4 pb-6 pt-[calc(env(safe-area-inset-top)+12px)] sm:px-6 lg:px-10 lg:pb-10 lg:pt-28">
+          <Link href="/lista" className="glass tap inline-flex h-10 items-center gap-1 rounded-full pl-2.5 pr-4 text-[14px]">
+            <ChevronLeft size={20} /> Voltar
+          </Link>
 
-            {/* Blocos de números (inspirados na referência) */}
-            <div className="no-scrollbar -mx-4 mt-6 flex gap-2.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
-              {stats.map((s) => {
-                const body = (
-                  <>
-                    <span className="flex h-5 items-center gap-1 text-[12px] font-black tracking-tight" style={{ color: s.tone ?? "rgb(255 255 255 / 0.7)" }}>
-                      {s.icon}
-                      {s.label}
-                    </span>
-                    <span className="mt-1.5 text-[19px] font-bold tabular-nums leading-none">{s.value}</span>
-                    {s.caption && <span className="mt-1 text-[10.5px] text-white/50">{s.caption}</span>}
-                  </>
-                );
-                const cls = "glass flex min-w-[84px] shrink-0 flex-col items-start rounded-2xl px-3.5 py-3 transition-colors hover:bg-white/5";
-                return s.href ? (
-                  <a key={s.caption} href={s.href} target="_blank" rel="noreferrer" className={cls}>
-                    {body}
-                  </a>
-                ) : (
-                  <div key={s.caption} className={cls}>
-                    {body}
-                  </div>
-                );
-              })}
+          <div className="mt-[26vh] flex flex-col gap-6 lg:mt-[34vh] lg:flex-row lg:items-end lg:gap-12">
+            <div className="w-[46%] max-w-[220px] shrink-0 lg:w-[260px] lg:max-w-none">
+              <div className="rounded-3xl shadow-[0_30px_80px_rgb(0_0_0/0.65)]">
+                <Cover
+                  item={{ id: item.id, title: item.title, kind: item.kind, coverUrl: item.coverUrl, coverColor: item.coverColor, coverBlur: item.coverBlur }}
+                  size="lg"
+                  morph
+                  eager
+                  rounded="rounded-3xl"
+                />
+              </div>
             </div>
 
-            {item.kind !== "book" && access.tier !== "unknown" && (
-              <p className={`mt-5 flex items-center gap-2 text-[15px] font-medium ${access.tier === "mine" ? "text-success" : "text-white/85"}`}>
-                <span className={`h-2 w-2 rounded-full ${access.tier === "mine" ? "bg-success" : "bg-white/50"}`} /> {access.label}
-              </p>
-            )}
-
-            <div className="mt-6 flex items-center gap-2.5">
-              {mine ? (
+            <div className="min-w-0 flex-1">
+              {!mine && owner && <p className="mb-2 text-[13px] font-medium text-accent-2">Do backlog de {owner.name?.split(" ")[0]}</p>}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="glass rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]">{KIND_META[item.kind].label}</span>
+                {genres.map((g) => (
+                  <span key={g} className="glass rounded-full px-3 py-1 text-[12px] text-white/80">
+                    {g}
+                  </span>
+                ))}
+              </div>
+              {item.logoUrl ? (
                 <>
-                  <DoneButton itemId={item.id} kind={item.kind} />
-                  <PinButton itemId={item.id} initial={item.pinned} />
-                  <ItemMenu itemId={item.id} />
+                  <img src={item.logoUrl} alt={item.title} className="mt-5 max-h-[110px] w-auto max-w-[80%] object-contain object-left drop-shadow-[0_6px_30px_rgb(0_0_0/0.6)] lg:max-h-[150px] lg:max-w-[520px]" />
+                  <h1 className="sr-only">{item.title}</h1>
                 </>
               ) : (
-                <CopyButton itemId={item.id} />
+                <h1 className="mt-4 text-[34px] font-bold leading-[1.02] tracking-tight lg:text-[58px]">{item.title}</h1>
               )}
-            </div>
+              <p className="mt-3 text-[15px] text-white/70">
+                {[item.originalTitle && item.originalTitle !== item.title ? item.originalTitle : null, item.creators.slice(0, 3).join(", ")].filter(Boolean).join(" · ")}
+              </p>
 
-            {about && <p className="mt-7 max-w-3xl text-[15px] leading-[1.65] text-white/75 lg:text-[16px]">{about}</p>}
+              <div className="no-scrollbar -mx-4 mt-5 flex gap-2.5 overflow-x-auto overflow-y-hidden px-4 sm:mx-0 sm:flex-wrap sm:px-0">
+                {stats.map((s) => {
+                  const body = (
+                    <>
+                      <span className="flex h-5 items-center gap-1 text-[12px] font-black tracking-tight" style={{ color: s.tone ?? "rgb(255 255 255 / 0.7)" }}>
+                        {s.icon}
+                        {s.label}
+                      </span>
+                      <span className="mt-1.5 text-[19px] font-bold tabular-nums leading-none">{s.value}</span>
+                      {s.caption && <span className="mt-1 whitespace-nowrap text-[10.5px] text-white/50">{s.caption}</span>}
+                    </>
+                  );
+                  const cls = "glass flex min-w-[84px] shrink-0 flex-col items-start rounded-2xl px-3.5 py-3 transition-colors hover:bg-white/5";
+                  return s.href ? (
+                    <a key={s.caption} href={s.href} target="_blank" rel="noreferrer" className={cls}>
+                      {body}
+                    </a>
+                  ) : (
+                    <div key={s.caption} className={cls}>
+                      {body}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {item.kind !== "book" && access.tier !== "unknown" && (
+                <p className={`mt-4 flex items-center gap-2 text-[15px] font-medium ${access.tier === "mine" ? "text-success" : "text-white/85"}`}>
+                  <span className={`h-2 w-2 rounded-full ${access.tier === "mine" ? "bg-success" : "bg-white/50"}`} /> {access.label}
+                </p>
+              )}
+
+              <div className="mt-5 flex flex-wrap items-center gap-2.5">
+                {mine ? (
+                  <>
+                    <DoneButton itemId={item.id} kind={item.kind} />
+                    {item.trailer && <TrailerButton videoId={item.trailer} title={item.title} />}
+                    <PinButton itemId={item.id} initial={item.pinned} />
+                    <ItemMenu itemId={item.id} />
+                  </>
+                ) : (
+                  <>
+                    <CopyButton itemId={item.id} />
+                    {item.trailer && <TrailerButton videoId={item.trailer} title={item.title} />}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="relative mx-auto max-w-[1400px] space-y-12 px-4 pt-4 sm:px-6 lg:px-10">
+        {about && (
+          <section className="max-w-3xl">
+            <SectionTitle>Sinopse</SectionTitle>
+            <p className="text-[15px] leading-[1.7] text-white/75 lg:text-[16px]">{about}</p>
             {item.summary && item.overview && item.overview !== item.summary && (
-              <details className="mt-3 max-w-3xl text-[14px] text-white/55">
+              <details className="mt-3 text-[14px] text-white/55">
                 <summary className="cursor-pointer select-none text-white/70 hover:text-white">Sinopse completa</summary>
                 <p className="mt-2 leading-relaxed">{item.overview}</p>
               </details>
             )}
-          </div>
-        </div>
+          </section>
+        )}
 
-        <div className="mt-12 grid gap-10 lg:grid-cols-[1fr_380px] lg:gap-14">
-          <div className="min-w-0 space-y-10">
+        <Gallery title={item.kind === "game" ? "Screenshots" : "Cenas"} images={item.gallery} />
+
+        <div className="grid gap-12 lg:grid-cols-[1fr_380px] lg:gap-14">
+          <div className="min-w-0 space-y-12">
             <section>
               <SectionTitle>{item.kind === "game" ? "Onde jogar" : item.kind === "book" ? "Onde encontrar" : "Assistir online"}</SectionTitle>
               {(item.kind === "movie" || item.kind === "series") && <Providers availability={item.availability} myProviders={myProviders} />}
@@ -179,7 +205,7 @@ export default async function ItemPage({ params }: PageProps<"/item/[id]">) {
             {item.cast.length > 0 && <Cast title={item.kind === "book" ? "Autoria" : "Elenco"} people={item.cast} />}
           </div>
 
-          <aside className="space-y-10">
+          <aside className="space-y-8">
             {mine && (
               <section>
                 <SectionTitle>Suas notas</SectionTitle>

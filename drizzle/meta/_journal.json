@@ -36,6 +36,20 @@
       "when": 1790384416997,
       "tag": "0004_owner_required",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790385907071,
+      "tag": "0005_gallery",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790385934698,
+      "tag": "0006_logo",
+      "breakpoints": true
     }
   ]
 }

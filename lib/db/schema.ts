@@ -73,6 +73,12 @@ export const items = pgTable(
     // Cor dominante da capa (#rrggbb) e miniatura borrada (data URL) para placeholder instantâneo
     coverColor: text("cover_color"),
     coverBlur: text("cover_blur"),
+    // Screenshots/artes (jogos) e imagens de cena (filmes/séries), URLs canônicas
+    gallery: text("gallery").array().notNull().default([]),
+    // ID do vídeo no YouTube
+    trailer: text("trailer"),
+    // Logotipo do título (PNG transparente) para usar no lugar do texto no destaque
+    logoUrl: text("logo_url"),
     overview: text("overview"),
     genres: text("genres").array().notNull().default([]),
     creators: text("creators").array().notNull().default([]),

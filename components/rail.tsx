@@ -69,7 +69,7 @@ export function Rail({
       <RailHeader title={title} subtitle={subtitle} href={items.length ? href : undefined} />
       {items.length ? (
         <div className="group/rail relative">
-          <div ref={ref} className={`no-scrollbar flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto py-2 lg:scroll-px-10 lg:gap-4 ${GUTTER}`}>
+          <div ref={ref} className={`no-scrollbar flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto overflow-y-hidden py-3 lg:scroll-px-10 lg:gap-4 ${GUTTER}`}>
             {items.slice(0, 24).map((i) => (
               <div key={i.id} className="w-[128px] shrink-0 snap-start sm:w-[150px] lg:w-[172px] 2xl:w-[196px]">
                 <Poster item={i} morph={morphIds?.has(i.id)} />
@@ -93,11 +93,11 @@ export function TopTen({ items, morphIds }: { items: LiteItem[]; morphIds?: Set<
     <section className="rise">
       <RailHeader title="Top 10 do seu backlog" subtitle="Maiores notas entre tudo que você quer ver" />
       <div className="group/rail relative">
-        <div ref={ref} className={`no-scrollbar flex snap-x snap-mandatory gap-1 overflow-x-auto py-2 ${GUTTER}`}>
+        <div ref={ref} className={`no-scrollbar flex snap-x snap-mandatory gap-1 overflow-x-auto overflow-y-hidden pb-3 pt-4 ${GUTTER}`}>
           {items.slice(0, 10).map((i, idx) => (
             <Link key={i.id} href={`/item/${i.id}`} className="group flex shrink-0 snap-start items-end">
               <span
-                className="-mr-5 select-none text-[118px] font-black leading-[0.8] tracking-[-0.08em] text-transparent transition-colors duration-300 group-hover:text-white/10 lg:-mr-7 lg:text-[168px]"
+                className="-mr-5 select-none text-[118px] font-black leading-none tracking-[-0.08em] text-transparent transition-colors duration-300 group-hover:text-white/10 lg:-mr-7 lg:text-[168px]"
                 style={{ WebkitTextStroke: "2px rgb(148 163 184 / 0.45)" }}
               >
                 {idx + 1}

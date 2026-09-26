@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Dices, Heart, Info } from "lucide-react";
 import { togglePin } from "@/app/actions";
 import { artSrc, coverSrc } from "@/lib/img";
+import { ptGenre } from "@/lib/genres";
 import { accessFor, formatMinutes, KIND_META, scoreLabel } from "@/lib/kinds";
 import type { LiteItem } from "@/lib/queries";
 import { useBacklog } from "./backlog-context";
@@ -141,9 +142,14 @@ function Meta({ item, big = false }: { item: LiteItem; big?: boolean }) {
     <>
       <span className="glass inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/85">
         {KIND_META[item.kind].label}
-        {item.genres[0] && <span className="font-normal normal-case tracking-normal text-white/55">· {item.genres[0]}</span>}
+        {item.genres[0] && <span className="font-normal normal-case tracking-normal text-white/55">· {ptGenre(item.genres[0])}</span>}
       </span>
-      <h2 className={`mt-3 font-bold leading-[1.02] tracking-tight ${big ? "text-[clamp(40px,4.4vw,68px)] line-clamp-2" : "text-[28px] line-clamp-2"}`}>{item.title}</h2>
+      {big && item.logoUrl ? (
+        // Logotipo oficial no lugar do título (como nos apps de streaming)
+        <img src={item.logoUrl} alt={item.title} className="mt-5 max-h-[150px] w-auto max-w-[min(520px,80%)] object-contain object-left drop-shadow-[0_6px_30px_rgb(0_0_0/0.6)]" />
+      ) : (
+        <h2 className={`mt-3 font-bold leading-[1.02] tracking-tight ${big ? "text-[clamp(40px,4.4vw,68px)] line-clamp-2" : "text-[28px] line-clamp-2"}`}>{item.title}</h2>
+      )}
       <p className={`mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-white/75 ${big ? "text-[15px]" : "text-[13px]"}`}>
         {score && (
           <span className={`rounded-md px-1.5 py-0.5 text-[12px] font-bold ${score.source === "IMDb" ? "bg-[#f5c518] text-black" : "bg-white/90 text-black"}`}>

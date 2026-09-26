@@ -117,11 +117,18 @@ type Details = {
   };
   external_ids?: { imdb_id?: string | null };
   "watch/providers"?: { results?: Record<string, ProvidersBlock> };
+  images?: {
+    backdrops?: { file_path: string; iso_639_1: string | null; vote_average: number; width: number }[];
+    logos?: { file_path: string; iso_639_1: string | null; vote_average: number }[];
+  };
+  videos?: { results?: { key: string; site: string; type: string; iso_639_1: string; official: boolean }[] };
 };
 
 export async function getTmdbDetails(kind: TmdbKind, id: number | string): Promise<Partial<NewItem>> {
   const d = await tmdb<Details>(`/${path(kind)}/${id}`, {
-    append_to_response: "credits,external_ids,watch/providers",
+    append_to_response: "credits,external_ids,watch/providers,images,videos",
+    include_image_language: "pt,en,null",
+    include_video_language: "pt,en",
   });
   // Sinopse em pt-BR às vezes vem vazia; cai para inglês
   let overview = d.overview || null;
@@ -138,9 +145,25 @@ export async function getTmdbDetails(kind: TmdbKind, id: number | string): Promi
       ? (d.credits?.crew ?? []).filter((c) => c.job === "Director").map((c) => c.name)
       : (d.created_by ?? []).map((c) => c.name);
 
+  // Cenas sem texto primeiro; logotipo em pt, senão en; trailer em pt, senão en
+  const backdrops = (d.images?.backdrops ?? [])
+    .filter((b) => b.width >= 1280)
+    .sort((a, b) => Number(a.iso_639_1 !== null) - Number(b.iso_639_1 !== null) || b.vote_average - a.vote_average)
+    .map((b) => tmdbImage(b.file_path, "w1280")!)
+    .filter((u) => !u.endsWith(d.backdrop_path ?? "~"))
+    .slice(0, 10);
+  const logos = d.images?.logos ?? [];
+  const logo = logos.find((l) => l.iso_639_1 === "pt") ?? logos.find((l) => l.iso_639_1 === "en") ?? logos[0];
+  const vids = (d.videos?.results ?? []).filter((v) => v.site === "YouTube" && (v.type === "Trailer" || v.type === "Teaser"));
+  const rank = (v: (typeof vids)[number]) => (v.type === "Trailer" ? 0 : 2) + (v.iso_639_1 === "pt" ? 0 : 1) + (v.official ? 0 : 0.5);
+  const trailer = [...vids].sort((a, b) => rank(a) - rank(b))[0]?.key ?? null;
+
   return {
     kind,
     tmdbId: d.id,
+    gallery: backdrops,
+    trailer,
+    logoUrl: logo ? tmdbImage(logo.file_path, "w500") : null,
     title: d.title ?? d.name ?? "",
     originalTitle: d.original_title ?? d.original_name ?? null,
     year: yearOf(d.release_date ?? d.first_air_date),
