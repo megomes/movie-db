@@ -36,13 +36,13 @@ export function AddPill() {
 // Celular: botão flutuante no meio da doca, com anel colorido; de tempos em tempos o ícone gira pelos tipos
 export function AddFab({ active }: { active: boolean }) {
   return (
-    <motion.div whileTap={{ scale: 0.86 }} className="relative -mt-7">
+    <motion.div whileTap={{ scale: 0.86 }} className="relative -mt-8">
       <Link
         href="/adicionar"
         aria-label="Adicionar"
-        className={`add-glow add-fab flex h-[60px] w-[60px] items-center justify-center rounded-full ${active ? "add-fab-on" : ""}`}
+        className={`add-glow add-fab flex h-14 w-14 items-center justify-center rounded-full ${active ? "add-fab-on" : ""}`}
       >
-        <Slot size={32} className="slot-idle" />
+        <Slot size={30} className="slot-idle" />
       </Link>
     </motion.div>
   );

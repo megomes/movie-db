@@ -374,7 +374,7 @@ body {
 .add-fab {
   box-shadow:
     0 10px 30px rgb(47 123 255 / 0.55),
-    0 0 0 6px rgb(6 8 13 / 0.9);
+    0 0 0 4px rgb(6 8 13 / 0.9);
 }
 /* Caça-níquel: + -> filme -> série -> jogo -> livro (cada passo = 1/5 do rolo) */
 @keyframes slot {

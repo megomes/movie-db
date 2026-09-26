@@ -212,49 +212,55 @@ function Dock() {
       <nav
         className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-center px-3 pb-[calc(env(safe-area-inset-bottom)+12px)] lg:hidden"
       >
-        <ul className="glass-nav flex w-full max-w-md items-center rounded-full p-1">
+        <ul className="glass-nav flex w-full max-w-lg items-center rounded-[28px] px-1.5 py-1">
           {withItems(NAV).map(({ href, label, icon: Icon, match }, idx, list) => {
             const active = match(pathname, k);
             return (
               <Fragment key={href}>
-                {/* Adicionar no meio da doca, flutuando */}
+                {/* Adicionar no meio da doca, flutuando, com espaço só dele */}
                 {idx === Math.ceil(list.length / 2) && (
-                  <li className="flex flex-1 justify-center">
+                  <li className="flex w-20 shrink-0 justify-center">
                     <AddFab active={pathname === "/adicionar"} />
                   </li>
                 )}
-              <li className="flex-1">
-                <Link
-                  href={href}
-                  aria-label={label}
-                  onClick={(e) => {
-                    if (pathname === "/lista" && href.startsWith("/lista")) {
-                      e.preventDefault();
-                      window.history.pushState(null, "", href);
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }
-                  }}
-                  className="relative flex h-12 w-full items-center justify-center rounded-full"
-                >
-                  {active && <motion.span layoutId="dock-blob" className="btn-accent absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 32 }} />}
-                  <Icon size={21} strokeWidth={active ? 2.3 : 1.8} className={`relative transition-colors ${active ? "text-white" : "text-white/60"}`} />
-                </Link>
-              </li>
+                <li className="min-w-0 flex-1">
+                  <Link
+                    href={href}
+                    aria-label={label}
+                    onClick={(e) => {
+                      if (pathname === "/lista" && href.startsWith("/lista")) {
+                        e.preventDefault();
+                        window.history.pushState(null, "", href);
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      }
+                    }}
+                    className="flex h-16 w-full flex-col items-center justify-center gap-1"
+                  >
+                    {/* Seleção: pílula fixa atrás do ícone (não estica até o botão do meio) */}
+                    <span className="relative flex h-8 w-10 items-center justify-center">
+                      {active && <motion.span layoutId="dock-blob" className="btn-accent absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 32 }} />}
+                      <Icon size={21} strokeWidth={active ? 2.3 : 1.8} className={`relative transition-colors ${active ? "text-white" : "text-white/65"}`} />
+                    </span>
+                    <span className={`truncate text-[10.5px] leading-none transition-colors ${active ? "font-semibold text-white" : "text-white/55"}`}>{label}</span>
+                  </Link>
+                </li>
               </Fragment>
             );
           })}
           {withItems(NAV).length < 2 && (
-            <li className="flex flex-1 justify-center">
+            <li className="flex w-20 shrink-0 justify-center">
               <AddFab active={pathname === "/adicionar"} />
             </li>
           )}
-          <li className="mx-1 h-6 w-px bg-white/15" />
-          <li>
-            <button onClick={() => setMenu(true)} aria-label="Menu" className="relative flex h-12 w-12 items-center justify-center">
-              <span className={`block h-8 w-8 overflow-hidden rounded-full ring-2 ${menuActive ? "ring-accent" : "ring-white/25"}`}>
-                {me.image ? <img src={me.image} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" /> : <span className="flex h-full items-center justify-center bg-bg-3 text-xs">{me.name?.[0]}</span>}
+          <li className="min-w-0 flex-1">
+            <button onClick={() => setMenu(true)} aria-label="Menu" className="flex h-16 w-full flex-col items-center justify-center gap-1">
+              <span className="relative flex h-8 w-10 items-center justify-center">
+                <span className={`block h-7 w-7 overflow-hidden rounded-full ring-2 ${menuActive ? "ring-accent" : "ring-white/25"}`}>
+                  {me.image ? <img src={me.image} alt="" className="h-full w-full object-cover" referrerPolicy="no-referrer" /> : <span className="flex h-full items-center justify-center bg-bg-3 text-xs">{me.name?.[0]}</span>}
+                </span>
+                {reviewCount > 0 && <span className="absolute right-0.5 top-0 h-2.5 w-2.5 rounded-full bg-danger ring-2 ring-black/60" />}
               </span>
-              {reviewCount > 0 && <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-danger ring-2 ring-black/60" />}
+              <span className={`text-[10.5px] leading-none ${menuActive ? "font-semibold text-white" : "text-white/55"}`}>Você</span>
             </button>
           </li>
         </ul>
