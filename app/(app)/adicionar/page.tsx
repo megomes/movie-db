@@ -1,0 +1,30 @@
+import { AddSearch } from "@/components/add-search";
+
+export const metadata = { title: "Adicionar" };
+
+// Também recebe o share target do PWA: /adicionar?title=...&text=...&url=...
+export default async function AddPage({ searchParams }: PageProps<"/adicionar">) {
+  const sp = await searchParams;
+  const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
+  const shared = [one(sp.title), one(sp.text), one(sp.url)].join(" ");
+  const imdbId = shared.match(/imdb\.com\/(?:[a-z-]+\/)?title\/(tt\d+)/i)?.[1] ?? null;
+  const steamTitle = shared.match(/store\.steampowered\.com\/app\/\d+\/([^/?\s]+)/i)?.[1]?.replace(/_/g, " ") ?? null;
+  // Tira URLs e sufixos comuns ("- IMDb", "| Letterboxd") do texto compartilhado
+  const initialQuery =
+    one(sp.q) ||
+    steamTitle ||
+    shared
+      .replace(/https?:\/\/\S+/g, "")
+      .replace(/\s*[-|–]\s*(IMDb|Letterboxd|Steam|Rotten Tomatoes|Goodreads|Skoob|Amazon.*)\s*$/i, "")
+      .replace(/\s*\(\d{4}\)\s*/, " ")
+      .trim();
+  const initialKind = steamTitle ? "game" : "any";
+
+  return (
+    <div className="px-4 pt-6">
+      <h1 className="font-display text-3xl font-extrabold">Adicionar</h1>
+      <p className="mt-1 text-sm text-muted">Busca em TMDB, IGDB e Google Books ao mesmo tempo.</p>
+      <AddSearch initialQuery={initialQuery} initialKind={initialKind} imdbId={imdbId} />
+    </div>
+  );
+}
