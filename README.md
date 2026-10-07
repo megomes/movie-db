@@ -102,6 +102,10 @@ npx tsx --env-file=.env.local scripts/rescore.ts
 | Auth     | Neon Auth (Google), allow-list of e-mails                 |
 | Hosting  | Vercel, with a daily cron                                 |
 
+## License
+
+[MIT](LICENSE)
+
 <br>
 
 <div align="center">
