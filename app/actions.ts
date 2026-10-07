@@ -72,7 +72,7 @@ async function validTags(ownerId: string, kind: Kind, tagIds: string[]) {
 const legacyFields = (kind: Kind, names: string[]) =>
   kind === "game" ? { myPlatforms: names } : kind === "book" ? { category: names[0] ?? null } : {};
 
-// collection: adiciona numa lista compartilhada (ex.: Livros para o Felipe) em vez do seu backlog
+// collection: adiciona numa lista compartilhada (ex.: Livros da família) em vez do seu backlog
 export async function addItem(kind: string, externalId: string, tagIds: string[] = [], collection?: string) {
   const user = await requireUser();
   const k = assertKind(kind);

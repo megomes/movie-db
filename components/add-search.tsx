@@ -55,11 +55,11 @@ export function AddSearch({
   initialQuery: string;
   initialKind: Kind | "any";
   imdbId: string | null;
-  /** Lista compartilhada de destino (ex.: Livros para o Felipe): sem tags, só livros */
+  /** Lista compartilhada de destino (ex.: Livros da família): sem tags, só livros */
   collection?: string;
 }) {
-  const { items: mine, felipe } = useBacklog();
-  const items = collection ? felipe : mine;
+  const { items: mine, family } = useBacklog();
+  const items = collection ? family : mine;
   const [kind, setKind] = useState<Kind | "any">(initialKind);
   const [query, setQuery] = useState(initialQuery);
   const [status, setStatus] = useState<Record<string, "adding" | string>>({});

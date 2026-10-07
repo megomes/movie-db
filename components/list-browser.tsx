@@ -6,7 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowDownAZ, Baby, Check, ChevronDown, ChevronRight, Clock, Plus, Search, Shuffle, Sparkles, Star, X } from "lucide-react";
-import { COLLECTIONS, FELIPE } from "@/lib/collections";
+import { COLLECTIONS, FAMILY_LIST } from "@/lib/collections";
 import type { Kind } from "@/lib/db/schema";
 import { normalize } from "@/lib/sources/http";
 import { ptGenre } from "@/lib/genres";
@@ -161,12 +161,12 @@ export function ListBrowser({
       .map(([k, items]) => ({ key: k, title: k, href: undefined, items }));
   }, [visible, kind, q, filter, onlyPinned, onlyMine, onlySale, provider, tagList, tagMeta, base]);
 
-  // Livros para o Felipe: lista compartilhada, sempre no fim da divisão Livros
-  const felipe = useMemo(() => {
+  // Livros da família: lista compartilhada, sempre no fim da divisão Livros
+  const family = useMemo(() => {
     if (readOnly || mode === "home" || kind !== "book") return null;
     const nq = normalize(q);
-    return nq ? ctx.felipe.filter((i) => normalize([i.title, ...i.creators].join(" ")).includes(nq)) : ctx.felipe;
-  }, [readOnly, mode, kind, q, ctx.felipe]);
+    return nq ? ctx.family.filter((i) => normalize([i.title, ...i.creators].join(" ")).includes(nq)) : ctx.family;
+  }, [readOnly, mode, kind, q, ctx.family]);
 
   const quick = [
     { on: onlyPinned, set: setOnlyPinned, label: "♥ Quero muito", show: true },
@@ -328,22 +328,22 @@ export function ListBrowser({
       </div>
       {!visible.length && <p className="px-4 py-24 text-center text-text-2">Nada por aqui com esses filtros.</p>}
 
-      {felipe && (!q || felipe.length > 0) && (
+      {family && (!q || family.length > 0) && (
         <section className="mt-16">
           <div className={`mb-3 flex items-end justify-between gap-4 ${GUTTER}`}>
             <div className="min-w-0">
               <h3 className="flex items-center gap-2 text-[20px] font-bold tracking-tight lg:text-[22px]">
-                <Baby size={20} className="text-accent-2" /> {COLLECTIONS[FELIPE].title} <span className="text-[14px] font-semibold text-text-3">{felipe.length}</span>
+                <Baby size={20} className="text-accent-2" /> {COLLECTIONS[FAMILY_LIST].title} <span className="text-[14px] font-semibold text-text-3">{family.length}</span>
               </h3>
-              <p className="mt-0.5 text-[13px] text-text-2">{COLLECTIONS[FELIPE].subtitle}</p>
+              <p className="mt-0.5 text-[13px] text-text-2">{COLLECTIONS[FAMILY_LIST].subtitle}</p>
             </div>
-            <Link href="/adicionar?k=book&para=felipe" className="glass tap flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium text-white/80 hover:text-white">
+            <Link href="/adicionar?k=book&para=familia" className="glass tap flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium text-white/80 hover:text-white">
               <Plus size={15} /> Adicionar
             </Link>
           </div>
-          {felipe.length ? (
+          {family.length ? (
             <div className={`grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 lg:gap-5 2xl:grid-cols-8 ${GUTTER}`}>
-              {felipe.map((i, idx) => (
+              {family.map((i, idx) => (
                 <div key={i.id} className="rise" style={{ animationDelay: `${Math.min(idx, 18) * 20}ms` }}>
                   <Poster item={i} morph={!noMorphIds?.has(i.id)} />
                 </div>

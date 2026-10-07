@@ -1,6 +1,6 @@
 import { AddSearch } from "@/components/add-search";
 import { PageHeader } from "@/components/page-header";
-import { COLLECTIONS, FELIPE } from "@/lib/collections";
+import { COLLECTIONS, FAMILY_LIST } from "@/lib/collections";
 import { KINDS } from "@/lib/kinds";
 
 export const metadata = { title: "Adicionar" };
@@ -23,8 +23,8 @@ export default async function AddPage({ searchParams }: PageProps<"/adicionar">)
       .trim();
   const k = KINDS.find((x) => x === one(sp.k));
   const initialKind = steamTitle ? "game" : (k ?? "any");
-  // ?para=felipe: adiciona na lista compartilhada em vez do backlog pessoal
-  const collection = one(sp.para) === "felipe" ? FELIPE : undefined;
+  // ?para=familia: adiciona na lista compartilhada em vez do backlog pessoal
+  const collection = one(sp.para) === "familia" ? FAMILY_LIST : undefined;
 
   return (
     <div className="mx-auto max-w-[1400px]">

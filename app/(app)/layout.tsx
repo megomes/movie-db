@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/app-shell";
 import { BacklogProvider } from "@/components/backlog-context";
 import { SiteFooter } from "@/components/site-footer";
-import { FELIPE } from "@/lib/collections";
+import { FAMILY_LIST } from "@/lib/collections";
 import { countDone, doneHours, listCollection, listItems, listPeople, listShared, listTags, toLite } from "@/lib/queries";
 import { getProfile, requireUser } from "@/lib/session";
 
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const user = await requireUser();
-  const [rows, profile, people, tags, shared, doneCount, watchedHours, felipe] = await Promise.all([
+  const [rows, profile, people, tags, shared, doneCount, watchedHours, family] = await Promise.all([
     listItems(user.id),
     getProfile(user.id),
     listPeople(),
@@ -18,7 +18,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
     listShared(user.id),
     countDone(user.id),
     doneHours(user.id),
-    listCollection(FELIPE),
+    listCollection(FAMILY_LIST),
   ]);
   const items = rows.map(toLite);
   const reviewCount = rows.filter((r) => r.matchStatus !== "matched").length;
@@ -33,7 +33,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       tags={tags}
       shared={shared}
       doneCount={doneCount}
-      felipe={felipe}
+      family={family}
     >
       <AppShell footer={<SiteFooter doneHours={watchedHours} />}>{children}</AppShell>
     </BacklogProvider>

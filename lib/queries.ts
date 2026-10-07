@@ -14,7 +14,7 @@ export async function listItems(ownerId: string) {
     .orderBy(desc(items.createdAt));
 }
 
-// Lista compartilhada (ex.: Livros para o Felipe): igual para todo mundo
+// Lista compartilhada (ex.: Livros da família): igual para todo mundo
 export async function listCollection(ownerId: string) {
   const rows = await db
     .select()

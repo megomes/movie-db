@@ -60,7 +60,7 @@ export default async function ItemPage({ params }: PageProps<"/item/[id]">) {
   const { id } = await params;
   const [item, profile, people, tags] = await Promise.all([getItem(id), getProfile(user.id), listPeople(), listTags(user.id)]);
   if (!item) notFound();
-  // Lista compartilhada (Livros para o Felipe): todo mundo edita, mas não é backlog pessoal (sem "já li", sem tags)
+  // Lista compartilhada (Livros da família): todo mundo edita, mas não é backlog pessoal (sem "já li", sem tags)
   const collection = isShared(item.ownerId) ? COLLECTIONS[item.ownerId] : null;
   const mine = item.ownerId === user.id || !!collection;
   const owner = people.find((p) => p.userId === item.ownerId);
