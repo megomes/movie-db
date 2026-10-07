@@ -1,6 +1,7 @@
 /**
  * Importa o backlog do Obsidian uma única vez.
- *   npm run import:obsidian -- --owner=email@x.com   -> importa tudo para o backlog dessa pessoa
+ *   npm run import:obsidian -- --owner=email@x.com --dir="<vault>/Backlog"   -> importa tudo para o backlog dessa pessoa
+ *   (a pasta também pode vir de OBSIDIAN_BACKLOG_DIR no .env.local)
  *   npm run import:obsidian -- --dry   -> só mostra o que faria
  * É idempotente: pula notas cujo source_path já está no banco.
  */
@@ -14,11 +15,14 @@ import { syncLegacyTags } from "../lib/tags-sync";
 import { findByImdbId } from "../lib/sources/tmdb";
 import { normalize } from "../lib/sources/http";
 
-const ROOT = "C:/Users/mathe/Documents/Obsidian Notes/Personal Notes/Backlog";
+const arg = (name: string) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
+const ROOT = arg("dir") ?? process.env.OBSIDIAN_BACKLOG_DIR ?? "";
+if (!ROOT) throw new Error('Informe a pasta do backlog: --dir="<vault>/Backlog" ou OBSIDIAN_BACKLOG_DIR');
 const MEDIA_DIR = path.join(ROOT, "Media/Itens");
 const BOOKS_DIR = path.join(ROOT, "Biblioteca/Livros");
 const DRY = process.argv.includes("--dry");
-const OWNER_EMAIL = process.argv.find((a) => a.startsWith("--owner="))?.slice(8) ?? "matheuservilha@gmail.com";
+const OWNER_EMAIL = arg("owner") ?? process.env.OBSIDIAN_BACKLOG_OWNER ?? "";
+if (!OWNER_EMAIL) throw new Error("Informe o dono: --owner=email@x.com ou OBSIDIAN_BACKLOG_OWNER");
 let OWNER_ID = "";
 
 type Entry = {
