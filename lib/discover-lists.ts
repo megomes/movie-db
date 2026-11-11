@@ -28,6 +28,8 @@ export const PERIODS = [
   { id: "6m", label: "Últimos 6 meses", hint: "Lançados entre 3 e 6 meses atrás, com pelo menos 3 avaliações", fromDays: 91, toDays: 182, minRatings: 3 },
   { id: "1a", label: "Último ano", hint: "Lançados entre 6 meses e 1 ano atrás, com pelo menos 5 avaliações", fromDays: 182, toDays: 365, minRatings: 5 },
   { id: "2a", label: "Últimos 2 anos", hint: "Lançados entre 1 e 2 anos atrás, com pelo menos 10 avaliações", fromDays: 365, toDays: 730, minRatings: 10 },
+  { id: "5a", label: "Últimos 5 anos", hint: "Lançados entre 2 e 5 anos atrás, com pelo menos 15 avaliações", fromDays: 730, toDays: 1826, minRatings: 15 },
+  { id: "10a", label: "Últimos 10 anos", hint: "Lançados entre 5 e 10 anos atrás, com pelo menos 25 avaliações", fromDays: 1826, toDays: 3652, minRatings: 25 },
   { id: "todos", label: "De todos os tempos", hint: "Com pelo menos 40 avaliações, sem repetir os de cima", fromDays: null, toDays: null, minRatings: 40 },
 ] as const;
 export type PeriodId = (typeof PERIODS)[number]["id"];
