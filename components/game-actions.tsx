@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ChevronLeft, Loader2, Plus } from "lucide-react";
 import { addItem } from "@/app/actions";
+import { InstallChip, type InstallTarget, type Installed } from "./install-dialog";
 
 // Volta para onde a pessoa estava (Descobrir, Meu Switch…); aberta direto por link, vai para o fallback
 export function BackButton({ fallback }: { fallback: string }) {
@@ -40,4 +41,10 @@ export function GameBacklogButton({ igdbId, switchTagId }: { igdbId: number; swi
       {state === "error" ? "Tentar de novo" : "Pôr no backlog"}
     </button>
   );
+}
+
+// Instalar/desinstalar no Switch a partir da página do jogo (recarrega os dados do servidor depois)
+export function GameInstallButton({ game, installed }: { game: InstallTarget; installed: Installed | null }) {
+  const router = useRouter();
+  return <InstallChip game={game} installed={installed} size="lg" onChange={() => router.refresh()} />;
 }

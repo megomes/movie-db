@@ -177,6 +177,14 @@ export async function switchTagId(ownerId: string) {
   return t?.id ?? null;
 }
 
+export async function getSwitchGame(ownerId: string, igdbId: number) {
+  const [row] = await db
+    .select({ id: switchGames.id, sizeMb: switchGames.sizeMb })
+    .from(switchGames)
+    .where(and(eq(switchGames.ownerId, ownerId), eq(switchGames.igdbId, igdbId)));
+  return row ?? null;
+}
+
 export async function listSwitchGames(ownerId: string) {
   return db.select().from(switchGames).where(eq(switchGames.ownerId, ownerId)).orderBy(desc(switchGames.sizeMb));
 }

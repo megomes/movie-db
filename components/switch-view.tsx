@@ -10,6 +10,7 @@ import { formatSize } from "@/lib/kinds";
 import type { SearchResult } from "@/lib/search";
 import { useSearch } from "./add-search";
 import { Cover } from "./cover";
+import { Sheet, SizeField, toMb } from "./install-dialog";
 import { GUTTER } from "./rail";
 import { BacklogButton, ShotCover, useBacklogToggle, type BacklogRef } from "./shot-cover";
 
@@ -233,11 +234,6 @@ function SwitchCard({
   );
 }
 
-const toMb = (value: string, unit: "GB" | "MB") => {
-  const n = Number(value.replace(",", "."));
-  return Number.isFinite(n) && n > 0 ? Math.round(unit === "GB" ? n * 1024 : n) : null;
-};
-
 // Busca o jogo no IGDB e pede o tamanho que ele ocupa no console
 function AddSwitchDialog({ installed, onClose, onAdded }: { installed: Set<number>; onClose: () => void; onAdded: () => void }) {
   const [query, setQuery] = useState("");
@@ -263,23 +259,7 @@ function AddSwitchDialog({ installed, onClose, onAdded }: { installed: Set<numbe
   }
 
   return (
-    <motion.div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-start sm:pt-[12vh]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <button className="absolute inset-0 cursor-default bg-black/60 backdrop-blur-sm" onClick={onClose} aria-label="Fechar" />
-      <motion.div
-        role="dialog"
-        aria-label="Adicionar ao Switch"
-        initial={{ y: 30, scale: 0.97 }}
-        animate={{ y: 0, scale: 1 }}
-        exit={{ y: 30, scale: 0.97 }}
-        transition={{ type: "spring", stiffness: 420, damping: 34 }}
-        className="glass-strong relative flex max-h-[85vh] w-full flex-col overflow-hidden rounded-t-3xl pb-[env(safe-area-inset-bottom)] sm:max-w-lg sm:rounded-3xl"
-      >
-        <div className="flex items-center justify-between px-5 pb-2 pt-4">
-          <h2 className="text-[18px] font-bold tracking-tight">Adicionar ao Switch</h2>
-          <button onClick={onClose} className="tap flex h-9 w-9 items-center justify-center rounded-full bg-white/10" aria-label="Fechar">
-            <X size={17} />
-          </button>
-        </div>
+    <Sheet label="Adicionar ao Switch" onClose={onClose}>
 
         {picked ? (
           <form
@@ -301,26 +281,7 @@ function AddSwitchDialog({ installed, onClose, onAdded }: { installed: Set<numbe
                 Trocar
               </button>
             </div>
-            <label className="block">
-              <span className="text-[12px] font-semibold uppercase tracking-wider text-white/45">Tamanho no console</span>
-              <div className="mt-1.5 flex gap-2">
-                <input
-                  autoFocus
-                  inputMode="decimal"
-                  value={size}
-                  onChange={(e) => setSize(e.target.value.replace(/[^\d.,]/g, ""))}
-                  placeholder="Ex.: 4,6"
-                  className="glass h-11 min-w-0 flex-1 rounded-full px-4 text-[15px] tabular-nums outline-none placeholder:text-text-3"
-                />
-                <div className="glass flex rounded-full p-1">
-                  {(["GB", "MB"] as const).map((u) => (
-                    <button key={u} type="button" onClick={() => setUnit(u)} className={`rounded-full px-3.5 text-[13px] font-semibold ${unit === u ? "btn-accent" : "text-white/65"}`}>
-                      {u}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </label>
+            <SizeField value={size} unit={unit} onValue={setSize} onUnit={setUnit} />
             {error && <p className="text-[13px] text-danger">{error}</p>}
             <button type="submit" disabled={!mb || saving} className="btn-accent tap flex h-11 w-full items-center justify-center gap-2 rounded-full text-[15px] font-semibold disabled:opacity-40">
               {saving ? <Loader2 size={17} className="animate-spin" /> : <Plus size={17} />} Adicionar {mb ? `(${formatSize(mb)})` : ""}
@@ -368,7 +329,6 @@ function AddSwitchDialog({ installed, onClose, onAdded }: { installed: Set<numbe
             </ul>
           </>
         )}
-      </motion.div>
-    </motion.div>
+    </Sheet>
   );
 }

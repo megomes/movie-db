@@ -4,13 +4,14 @@ import { notFound } from "next/navigation";
 import { CalendarDays, ChevronLeft, Clock, ExternalLink, FileText, Gamepad2, Star, Tag, Trophy } from "lucide-react";
 import { Cover } from "@/components/cover";
 import { AmbientColor, CopyButton, DoneBadge, DoneButton, ItemMenu, ItemTags, NotesEditor, PinButton } from "@/components/item-actions";
+import { GameInstallButton } from "@/components/game-actions";
 import { Gallery, TrailerButton } from "@/components/media-gallery";
 import { COLLECTIONS, isShared } from "@/lib/collections";
 import { displayGenres } from "@/lib/genres";
 import type { Availability, CastMember, Item, Provider } from "@/lib/db/schema";
 import { artSrc, coverSrc } from "@/lib/img";
 import { accessFor, formatMinutes, KIND_META } from "@/lib/kinds";
-import { getItem, listPeople, listTags } from "@/lib/queries";
+import { getItem, getSwitchGame, listPeople, listTags } from "@/lib/queries";
 import { getProfile, requireUser } from "@/lib/session";
 
 export async function generateMetadata({ params }: PageProps<"/item/[id]">) {
@@ -60,6 +61,7 @@ export default async function ItemPage({ params }: PageProps<"/item/[id]">) {
   const { id } = await params;
   const [item, profile, people, tags] = await Promise.all([getItem(id), getProfile(user.id), listPeople(), listTags(user.id)]);
   if (!item) notFound();
+  const switchGame = item.kind === "game" && item.igdbId && item.ownerId === user.id ? await getSwitchGame(user.id, item.igdbId) : null;
   // Lista compartilhada (Livros da família): todo mundo edita, mas não é backlog pessoal (sem "já li", sem tags)
   const collection = isShared(item.ownerId) ? COLLECTIONS[item.ownerId] : null;
   const mine = item.ownerId === user.id || !!collection;
@@ -177,6 +179,9 @@ export default async function ItemPage({ params }: PageProps<"/item/[id]">) {
                       <DoneBadge itemId={item.id} kind={item.kind} doneAt={item.doneAt.toISOString()} />
                     ) : (
                       <DoneButton itemId={item.id} kind={item.kind} />
+                    )}
+                    {item.kind === "game" && item.igdbId && !collection && (
+                      <GameInstallButton game={{ igdbId: item.igdbId, title: item.title, coverUrl: item.coverUrl }} installed={switchGame} />
                     )}
                     {item.trailer && <TrailerButton videoId={item.trailer} title={item.title} />}
                     <PinButton itemId={item.id} initial={item.pinned} />

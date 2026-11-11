@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { unstable_cache } from "next/cache";
 import { CalendarDays, ExternalLink, Gamepad2, HardDrive, Trophy } from "lucide-react";
 import { Cover } from "@/components/cover";
-import { BackButton, GameBacklogButton } from "@/components/game-actions";
+import { BackButton, GameBacklogButton, GameInstallButton } from "@/components/game-actions";
 import { Gallery, TrailerButton } from "@/components/media-gallery";
 import { displayGenres } from "@/lib/genres";
 import { artSrc } from "@/lib/img";
@@ -104,6 +104,10 @@ export default async function GamePage({ params }: PageProps<"/jogo/[igdbId]">) 
 
               <div className="mt-5 flex flex-wrap items-center gap-2.5">
                 <GameBacklogButton igdbId={id} switchTagId={tagId} />
+                <GameInstallButton
+                  game={{ igdbId: id, title: game.title, coverUrl: game.coverUrl ?? null }}
+                  installed={onSwitch ? { id: onSwitch.id, sizeMb: onSwitch.sizeMb } : null}
+                />
                 {game.trailer && <TrailerButton videoId={game.trailer} title={game.title} />}
                 <a
                   href={`https://www.nintendo.com/pt-br/search/#q=${encodeURIComponent(game.title)}`}

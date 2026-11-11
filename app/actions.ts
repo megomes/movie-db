@@ -225,6 +225,16 @@ export async function addSwitchGame(igdbId: number, title: string, sizeMb: numbe
   const size = Math.round(sizeMb);
   const name = title.trim();
   if (!Number.isInteger(igdbId) || !name || !Number.isFinite(size) || size <= 0 || size > 1024 * 1024) throw new Error("Dados inválidos");
+  // Já instalado (mesmo que com outro título, ex.: "art of rally"): só atualiza o tamanho
+  const [existing] = await db
+    .update(switchGames)
+    .set({ sizeMb: size })
+    .where(and(eq(switchGames.ownerId, user.id), eq(switchGames.igdbId, igdbId)))
+    .returning();
+  if (existing) {
+    revalidatePath("/switch", "layout");
+    return existing;
+  }
   const cover = coverUrl?.startsWith("https://images.igdb.com/") ? coverUrl : null;
   const screenshots = (await getIgdbScreenshots([igdbId]).catch(() => new Map<number, string[]>())).get(igdbId) ?? [];
   const values = { ownerId: user.id, title: name, sizeMb: size, igdbId, coverUrl: cover, screenshots };
@@ -233,12 +243,14 @@ export async function addSwitchGame(igdbId: number, title: string, sizeMb: numbe
     .values(values)
     .onConflictDoUpdate({ target: [switchGames.ownerId, switchGames.title], set: { sizeMb: size, igdbId, coverUrl: cover, screenshots } })
     .returning();
-  revalidatePath("/switch");
+  revalidatePath("/switch", "layout");
+  revalidatePath(`/jogo/${igdbId}`);
   return row;
 }
 
 export async function removeSwitchGame(id: string) {
   const user = await requireUser();
   await db.delete(switchGames).where(and(eq(switchGames.id, id), eq(switchGames.ownerId, user.id)));
-  revalidatePath("/switch");
+  revalidatePath("/switch", "layout");
+  revalidatePath("/jogo/[igdbId]", "page");
 }
