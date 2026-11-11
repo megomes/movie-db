@@ -19,16 +19,14 @@ export function DiscoverView({
   groups,
   backlog,
   installed: installedIds,
-  tagId,
 }: {
   platform: PlatformId;
   list: ListId;
   groups: DiscoverGroup[];
   backlog: Record<number, BacklogRef>;
   installed: number[];
-  tagId: string | null;
 }) {
-  const { owned, busy, toggle } = useBacklogToggle(backlog, tagId);
+  const { owned, busy, toggle } = useBacklogToggle(backlog);
   const installed = useMemo(() => new Set(installedIds), [installedIds]);
   const sp = useSearchParams();
   // Fica na URL (e passa entre listas/plataformas): voltar de um jogo reabre do mesmo jeito
@@ -143,7 +141,7 @@ export function DiscoverView({
                 return (
                   <div key={g.igdbId} className="rise" style={{ animationDelay: `${Math.min(idx, 18) * 20}ms` }}>
                     <div className="group relative">
-                      <Link href={item ? `/item/${item.id}` : `/jogo/${g.igdbId}?plataforma=${platform}`} aria-label={g.title} className="block">
+                      <Link href={item ? `/item/${item.id}` : `/jogo/${g.igdbId}`} aria-label={g.title} className="block">
                         {cover}
                       </Link>
                       {!item?.done && <BacklogButton on={!!item} busy={busy.has(g.igdbId)} onClick={() => toggle(g.igdbId)} />}

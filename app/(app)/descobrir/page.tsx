@@ -1,6 +1,6 @@
 import { DiscoverView } from "@/components/discover-view";
-import { getDiscoverGroups, isListId, isPlatformId, LISTS, platformOf, PLATFORMS } from "@/lib/discover";
-import { backlogByIgdb, gameTagId, listSwitchGames } from "@/lib/queries";
+import { getDiscoverGroups, isListId, isPlatformId, LISTS, PLATFORMS } from "@/lib/discover";
+import { backlogByIgdb, listSwitchGames } from "@/lib/queries";
 import { requireUser } from "@/lib/session";
 
 export const metadata = { title: "Descobrir jogos" };
@@ -11,11 +11,7 @@ export default async function DiscoverPage({ searchParams }: PageProps<"/descobr
   const list = isListId(sp.lista) ? sp.lista : LISTS[0].id;
   const platform = isPlatformId(sp.plataforma) ? sp.plataforma : PLATFORMS[0].id;
 
-  const [groups, installed, tagId] = await Promise.all([
-    getDiscoverGroups(platform, list),
-    platform === "switch" ? listSwitchGames(user.id) : [],
-    gameTagId(user.id, platformOf(platform).tag),
-  ]);
+  const [groups, installed] = await Promise.all([getDiscoverGroups(platform, list), platform === "switch" ? listSwitchGames(user.id) : []]);
   const backlog = await backlogByIgdb(user.id, groups.flatMap((g) => g.games.map((x) => x.igdbId)));
 
   return (
@@ -26,7 +22,6 @@ export default async function DiscoverPage({ searchParams }: PageProps<"/descobr
       groups={groups}
       backlog={backlog}
       installed={installed.map((g) => g.igdbId).filter((x): x is number => x != null)}
-      tagId={tagId}
     />
   );
 }

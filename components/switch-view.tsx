@@ -23,7 +23,7 @@ export type SwitchEntry = {
   screenshots: string[];
 };
 
-// Jogo do backlog com a tag Switch que não está no console
+// Jogo do backlog que sai para Switch (pelo IGDB) e não está no console
 export type MissingEntry = { id: string; title: string; igdbId: number | null; coverUrl: string | null; screenshots: string[] };
 
 const FILTERS = [
@@ -38,13 +38,11 @@ type FilterId = (typeof FILTERS)[number]["id"];
 export function SwitchView({
   games: initial,
   backlog,
-  switchTagId,
   missing,
 }: {
   games: SwitchEntry[];
   missing: MissingEntry[];
   backlog: Record<number, BacklogRef>;
-  switchTagId: string | null;
 }) {
   const router = useRouter();
   const [games, setGames] = useState(initial);
@@ -63,7 +61,7 @@ export function SwitchView({
     setFilterState(f);
     window.history.replaceState(null, "", f === "all" ? "/switch" : `/switch?filtro=${f}`);
   }
-  const { owned, busy, toggle } = useBacklogToggle(backlog, switchTagId);
+  const { owned, busy, toggle } = useBacklogToggle(backlog);
 
   const itemOf = (g: SwitchEntry) => (g.igdbId != null ? (owned[g.igdbId] ?? null) : null);
   const total = games.reduce((s, g) => s + g.sizeMb, 0);

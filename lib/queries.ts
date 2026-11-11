@@ -172,14 +172,6 @@ export async function backlogByIgdb(ownerId: string, igdbIds: number[]) {
   return Object.fromEntries(rows.map((r) => [r.igdbId!, { id: r.id, done: !!r.doneAt }])) as Record<number, { id: string; done: boolean }>;
 }
 
-// Tag de jogo da pessoa pelo nome ("Switch", "PC"…): jogos adicionados pelo Descobrir/Meu Switch entram com ela
-export async function gameTagId(ownerId: string, name: string) {
-  const [t] = await db.select({ id: tags.id }).from(tags).where(and(eq(tags.ownerId, ownerId), eq(tags.kind, "game"), eq(tags.name, name)));
-  return t?.id ?? null;
-}
-
-export const switchTagId = (ownerId: string) => gameTagId(ownerId, "Switch");
-
 export async function getSwitchGame(ownerId: string, igdbId: number) {
   const [row] = await db
     .select({ id: switchGames.id, sizeMb: switchGames.sizeMb })
@@ -192,8 +184,8 @@ export async function listSwitchGames(ownerId: string) {
   return db.select().from(switchGames).where(eq(switchGames.ownerId, ownerId)).orderBy(desc(switchGames.sizeMb));
 }
 
-// Jogos de Switch no backlog (tag Switch, ainda não zerados) que não estão instalados
-export async function switchBacklogNotInstalled(ownerId: string, tagId: string, installedIgdb: number[]) {
+// Jogos do backlog (ainda não zerados) que saem para Switch, pelo IGDB, e não estão instalados
+export async function switchBacklogNotInstalled(ownerId: string, installedIgdb: number[]) {
   return db
     .select({ id: items.id, title: items.title, igdbId: items.igdbId, coverUrl: items.coverUrl, gallery: items.gallery, minutes: items.minutes })
     .from(items)
@@ -202,7 +194,7 @@ export async function switchBacklogNotInstalled(ownerId: string, tagId: string, 
         eq(items.ownerId, ownerId),
         eq(items.kind, "game"),
         isNull(items.doneAt),
-        sql`${tagId}::uuid = any(${items.tagIds})`,
+        sql`'Switch' = any(${items.platforms})`,
         installedIgdb.length ? sql`(${items.igdbId} is null or ${items.igdbId} <> all(${sql.raw(`array[${installedIgdb.map(Number).join(",")}]::int[]`)}))` : undefined,
       ),
     )

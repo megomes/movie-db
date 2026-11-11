@@ -19,8 +19,8 @@ export function BackButton({ fallback }: { fallback: string }) {
   );
 }
 
-// Põe o jogo no backlog (com a tag Switch) e abre a página completa do item
-export function GameBacklogButton({ igdbId, switchTagId }: { igdbId: number; switchTagId: string | null }) {
+// Põe o jogo no backlog e abre a página completa do item
+export function GameBacklogButton({ igdbId }: { igdbId: number }) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "adding" | "error">("idle");
   return (
@@ -29,7 +29,7 @@ export function GameBacklogButton({ igdbId, switchTagId }: { igdbId: number; swi
       onClick={async () => {
         setState("adding");
         try {
-          const id = await addItem("game", String(igdbId), switchTagId ? [switchTagId] : []);
+          const id = await addItem("game", String(igdbId));
           router.replace(`/item/${id}`);
         } catch {
           setState("error");

@@ -361,7 +361,7 @@ function GameWhere({ item }: { item: Item }) {
             {p?.discountPercent ? <span className="rounded-md bg-success px-1.5 text-[12px] font-bold text-black">-{p.discountPercent}%</span> : null}
           </LinkPill>
         )}
-        {item.myPlatforms.includes("Switch") && <LinkPill href={`https://www.nintendo.com/pt-br/search/#q=${encodeURIComponent(item.title)}`}>eShop</LinkPill>}
+        {item.platforms.includes("Switch") && <LinkPill href={`https://www.nintendo.com/pt-br/search/#q=${encodeURIComponent(item.title)}`}>eShop</LinkPill>}
         {item.gamePass && <span className="inline-flex h-11 items-center rounded-full bg-success/15 px-5 text-[14px] font-medium text-success">Game Pass (nuvem)</span>}
       </div>
       {item.platforms.length > 0 && <p className="text-[13px] text-white/45">Lançado para {item.platforms.join(", ")}</p>}

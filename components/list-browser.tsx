@@ -36,6 +36,9 @@ const streamsOn = (i: LiteItem) => (i.availability ? [...(i.availability.flatrat
 // "Amazon Prime Video" → "Prime Video", "Netflix Standard with Ads" → "Netflix"
 const shortName = (n: string) => n.replace(/^Amazon /, "").replace(/ (Standard|Basic) with Ads$/, "").replace(/ Amazon Channel$/, "");
 
+// Plataformas que viram filtro na aba Jogos (vêm do IGDB)
+const PLATFORM_FILTERS = ["PC", "Switch"] as const;
+
 function countBy(items: LiteItem[], pick: (i: LiteItem) => string[], label: (v: string) => string, limit = 14): TagOption[] {
   const m = new Map<string, number>();
   for (const i of items) for (const t of pick(i)) m.set(t, (m.get(t) ?? 0) + 1);
@@ -110,26 +113,25 @@ export function ListBrowser({
 
   const tagMeta = useMemo(() => new Map(tagList.map((t) => [t.id, t])), [tagList]);
   const ofKind = useMemo(() => (kind === "all" ? items : items.filter((i) => i.kind === kind)), [items, kind]);
-  // Filtro por tag. Em jogos, a tag de plataforma ("PC", "Switch") vale para todo jogo que sai nela, mesmo
-  // sem a tag: um jogo que sai nos dois aparece nos dois filtros.
-  const platformTag = useMemo(() => new Map(tagList.filter((t) => t.kind === "game").map((t) => [t.name, t.id])), [tagList]);
+  // Filtro por tag. Em jogos, PC e Switch vêm das plataformas do IGDB (não de tag): um jogo que sai nos dois
+  // aparece nos dois filtros. O valor do filtro é "plat:PC" / "plat:Switch".
   const filterTagsOf = useMemo(
     () => (i: LiteItem) => {
       const own = i.tagIds.filter((t) => tagMeta.has(t));
       if (i.kind !== "game") return own;
-      const extra = (i.platforms ?? []).map((p) => platformTag.get(p)).filter((t): t is string => !!t && !own.includes(t));
-      return extra.length ? [...own, ...extra] : own;
+      const plats = PLATFORM_FILTERS.filter((p) => i.platforms?.includes(p)).map((p) => `plat:${p}`);
+      return plats.length ? [...plats, ...own] : own;
     },
-    [tagMeta, platformTag],
+    [tagMeta],
   );
 
   const groups = useMemo((): TagGroup[] => {
     if (kind === "all") return [];
     const out: TagGroup[] = [];
-    const tagOpts = countBy(ofKind, filterTagsOf, (v) => tagMeta.get(v)?.name ?? v, 20).sort(
-      (a, b) => (tagMeta.get(a.value)?.position ?? 0) - (tagMeta.get(b.value)?.position ?? 0),
-    );
-    if (tagOpts.length) out.push({ id: "tag", label: "Tags", tags: tagOpts });
+    const rank = (v: string) => (v.startsWith("plat:") ? PLATFORM_FILTERS.indexOf(v.slice(5) as (typeof PLATFORM_FILTERS)[number]) - 100 : (tagMeta.get(v)?.position ?? 0));
+    const tagOpts = countBy(ofKind, filterTagsOf, (v) => (v.startsWith("plat:") ? v.slice(5) : (tagMeta.get(v)?.name ?? v)), 20).sort((a, b) => rank(a.value) - rank(b.value));
+    const onlyPlatforms = tagOpts.every((t) => t.value.startsWith("plat:"));
+    if (tagOpts.length) out.push({ id: "tag", label: onlyPlatforms ? "Plataforma" : "Tags", tags: tagOpts });
     if (kind !== "book") out.push({ id: "genre", label: "Gênero", tags: countBy(ofKind, genresOf, (v) => v, 12) });
     return out;
   }, [kind, ofKind, tagMeta, filterTagsOf]);
@@ -239,7 +241,8 @@ export function ListBrowser({
         </div>
       </header>
 
-      {!readOnly && !home && kind !== "all" && (
+      {/* Jogos não usam tag: PC e Switch vêm da plataforma do IGDB */}
+      {!readOnly && !home && kind !== "all" && kind !== "game" && (
         <div className={GUTTER}>
           <TagNudge key={kind} kind={kind} count={ofKind.length} />
         </div>

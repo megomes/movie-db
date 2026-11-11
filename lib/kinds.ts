@@ -16,7 +16,7 @@ export type Access = { tier: Tier; label: string; providers: Provider[] };
 const streamable = (a: Availability) => [...(a.flatrate ?? []), ...(a.free ?? []), ...(a.ads ?? [])];
 
 // Onde/como consumir o item no Brasil, do ponto de vista do usuário
-export function accessFor(item: Pick<Item, "kind" | "availability" | "myPlatforms" | "gamePass" | "steamPrice">, myProviders: number[]): Access {
+export function accessFor(item: Pick<Item, "kind" | "availability" | "platforms" | "gamePass" | "steamPrice">, myProviders: number[]): Access {
   if (item.kind === "movie" || item.kind === "series") {
     const a = item.availability ?? {};
     const stream = streamable(a);
@@ -37,8 +37,8 @@ export function accessFor(item: Pick<Item, "kind" | "availability" | "myPlatform
         label: price.discountPercent ? `Steam ${price.formatted} (-${price.discountPercent}%)` : `Steam ${price.formatted}`,
         providers: [],
       };
-    if (item.myPlatforms.includes("Switch")) return { tier: "shop", label: "eShop (Switch)", providers: [] };
-    return { tier: "unknown", label: item.myPlatforms.join(" · ") || "Jogo", providers: [] };
+    if (item.platforms.includes("Switch")) return { tier: "shop", label: "eShop (Switch)", providers: [] };
+    return { tier: "unknown", label: item.platforms.filter((p) => p === "PC" || p === "Switch").join(" · ") || "Jogo", providers: [] };
   }
   return { tier: "shop", label: "Livro", providers: [] };
 }

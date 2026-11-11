@@ -8,8 +8,7 @@ import { Gallery, TrailerButton } from "@/components/media-gallery";
 import { displayGenres } from "@/lib/genres";
 import { artSrc } from "@/lib/img";
 import { formatMinutes, formatSize } from "@/lib/kinds";
-import { isPlatformId, platformOf } from "@/lib/discover-lists";
-import { backlogByIgdb, gameTagId, listSwitchGames } from "@/lib/queries";
+import { backlogByIgdb, listSwitchGames } from "@/lib/queries";
 import { getIgdbDetails } from "@/lib/sources/igdb";
 import { requireUser } from "@/lib/session";
 
@@ -26,7 +25,7 @@ export async function generateMetadata({ params }: PageProps<"/jogo/[igdbId]">) 
 
 const compact = (n: number) => Intl.NumberFormat("pt-BR", { notation: "compact" }).format(n);
 
-export default async function GamePage({ params, searchParams }: PageProps<"/jogo/[igdbId]">) {
+export default async function GamePage({ params }: PageProps<"/jogo/[igdbId]">) {
   const user = await requireUser();
   const id = parseId((await params).igdbId);
   if (!id) notFound();
@@ -35,10 +34,7 @@ export default async function GamePage({ params, searchParams }: PageProps<"/jog
   const backlog = await backlogByIgdb(user.id, [id]);
   if (backlog[id]) redirect(`/item/${backlog[id].id}`);
 
-  // Entra no backlog com a tag da plataforma de onde veio (Descobrir de PC → "PC"); sem isso, Switch
-  const { plataforma } = await searchParams;
-  const tagName = platformOf(isPlatformId(plataforma) ? plataforma : "switch").tag;
-  const [game, installed, tagId] = await Promise.all([getGame(id), listSwitchGames(user.id), gameTagId(user.id, tagName)]);
+  const [game, installed] = await Promise.all([getGame(id), listSwitchGames(user.id)]);
   if (!game?.title) notFound();
   const onSwitch = installed.find((g) => g.igdbId === id);
   const art = artSrc(game.backdropUrl, "lg");
@@ -107,7 +103,7 @@ export default async function GamePage({ params, searchParams }: PageProps<"/jog
               </div>
 
               <div className="mt-5 flex flex-wrap items-center gap-2.5">
-                <GameBacklogButton igdbId={id} switchTagId={tagId} />
+                <GameBacklogButton igdbId={id} />
                 <GameInstallButton
                   game={{ igdbId: id, title: game.title, coverUrl: game.coverUrl ?? null }}
                   installed={onSwitch ? { id: onSwitch.id, sizeMb: onSwitch.sizeMb } : null}

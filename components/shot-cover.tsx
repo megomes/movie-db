@@ -87,7 +87,7 @@ export function BacklogButton({ on, busy, onClick }: { on: boolean; busy: boolea
 export type BacklogRef = { id: string; done: boolean };
 
 // Estado "está no backlog?" por jogo do IGDB, com pôr/tirar otimista (jogos entram com a tag Switch)
-export function useBacklogToggle(initial: Record<number, BacklogRef>, tagId: string | null) {
+export function useBacklogToggle(initial: Record<number, BacklogRef>) {
   const [owned, setOwned] = useState(initial);
   const [lastInitial, setLastInitial] = useState(initial);
   if (lastInitial !== initial) {
@@ -122,7 +122,7 @@ export function useBacklogToggle(initial: Record<number, BacklogRef>, tagId: str
           set(igdbId, null);
           await deleteItem(prev.id);
         } else {
-          const id = await addItem("game", String(igdbId), tagId ? [tagId] : []);
+          const id = await addItem("game", String(igdbId));
           set(igdbId, { id, done: false });
         }
       } catch {
