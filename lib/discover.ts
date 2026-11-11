@@ -20,6 +20,8 @@ type Raw = {
 const FIELDS = "fields name,first_release_date,cover.image_id,screenshots.image_id,total_rating,total_rating_count,genres.name";
 const POPULARITY = { visits: 1, wantToPlay: 2 } as const;
 const LIMIT = 100;
+// Cada grupo dos "Melhores" mostra no máximo isso; os cortados podem aparecer no grupo seguinte
+const PER_GROUP = 60;
 
 function toGame(g: Raw): DiscoverGame {
   const ts = g.first_release_date;
@@ -59,9 +61,12 @@ async function fetchList(platformId: PlatformId, id: ListId, period: PeriodId = 
   let rows: Raw[];
   switch (id) {
     case "top": {
-      const p = PERIODS.find((x) => x.id === period)!;
-      const released = p.toDays == null ? "" : ` & first_release_date > ${now - p.toDays * 86400} & first_release_date <= ${now - p.fromDays * 86400}`;
-      rows = await igdb<Raw[]>("games", `${FIELDS}; where ${where}${released} & total_rating_count >= ${p.minRatings}; sort total_rating desc; limit ${LIMIT};`);
+      // Busca o bastante para sobrar 60 novos depois de pular os grupos de cima (até 60 de cada um)
+      const i = PERIODS.findIndex((x) => x.id === period);
+      const p = PERIODS[i];
+      const released = p.days == null ? "" : ` & first_release_date > ${now - p.days * 86400} & first_release_date <= ${now}`;
+      const limit = Math.min(500, PER_GROUP * (i + 1));
+      rows = await igdb<Raw[]>("games", `${FIELDS}; where ${where}${released} & total_rating_count >= ${p.minRatings}; sort total_rating desc; limit ${limit};`);
       break;
     }
     case "hot":
@@ -84,12 +89,9 @@ async function fetchList(platformId: PlatformId, id: ListId, period: PeriodId = 
 }
 
 // Atualiza a cada 12h: as listas mudam devagar e o IGDB limita a 4 req/s
-export const getDiscoverList = unstable_cache(fetchList, ["discover-v4"], { revalidate: 60 * 60 * 12 });
+export const getDiscoverList = unstable_cache(fetchList, ["discover-v5"], { revalidate: 60 * 60 * 12 });
 
-// Cada grupo dos "Melhores" mostra no máximo isso (o de todos os tempos só pula os que apareceram)
-const PER_GROUP = 60;
-
-// Lista pronta para a página: "Melhores" vem em grupos por data de lançamento (o de todos os tempos sem repetir os de cima)
+// Lista pronta para a página: "Melhores" vem em grupos por data de lançamento, cada um sem repetir os de cima
 export async function getDiscoverGroups(platform: PlatformId, id: ListId): Promise<DiscoverGroup[]> {
   if (id !== "top") return [{ id, title: null, hint: null, games: await getDiscoverList(platform, id) }];
   const lists = await Promise.all(PERIODS.map((p) => getDiscoverList(platform, "top", p.id)));

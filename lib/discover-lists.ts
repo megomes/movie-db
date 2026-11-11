@@ -20,17 +20,18 @@ export const LISTS = [
 export type ListId = (typeof LISTS)[number]["id"];
 export const isListId = (v: unknown): v is ListId => LISTS.some((l) => l.id === v);
 
-// Grupos dos "Melhores" por janela de lançamento, sem sobreposição: cada uma começa onde a anterior termina.
-// Jogo recente tem poucas avaliações no IGDB, então o mínimo de avaliações cai junto com a janela.
+// Grupos dos "Melhores" por data de lançamento, acumulando: cada um pega tudo até o seu limite (2 anos = os últimos 2 anos
+// inteiros) e pula o que já apareceu acima. Quem ficou de fora pelo corte de 60 num grupo pode aparecer no seguinte.
+// Jogo recente tem poucas avaliações no IGDB, então o mínimo de avaliações cresce com a janela.
 export const PERIODS = [
-  { id: "1m", label: "Último mês", hint: "Lançados nos últimos 30 dias, com pelo menos 3 avaliações", fromDays: 0, toDays: 30, minRatings: 3 },
-  { id: "3m", label: "Último trimestre", hint: "Lançados entre 1 e 3 meses atrás, com pelo menos 3 avaliações", fromDays: 30, toDays: 91, minRatings: 3 },
-  { id: "6m", label: "Últimos 6 meses", hint: "Lançados entre 3 e 6 meses atrás, com pelo menos 3 avaliações", fromDays: 91, toDays: 182, minRatings: 3 },
-  { id: "1a", label: "Último ano", hint: "Lançados entre 6 meses e 1 ano atrás, com pelo menos 5 avaliações", fromDays: 182, toDays: 365, minRatings: 5 },
-  { id: "2a", label: "Últimos 2 anos", hint: "Lançados entre 1 e 2 anos atrás, com pelo menos 10 avaliações", fromDays: 365, toDays: 730, minRatings: 10 },
-  { id: "5a", label: "Últimos 5 anos", hint: "Lançados entre 2 e 5 anos atrás, com pelo menos 15 avaliações", fromDays: 730, toDays: 1826, minRatings: 15 },
-  { id: "10a", label: "Últimos 10 anos", hint: "Lançados entre 5 e 10 anos atrás, com pelo menos 25 avaliações", fromDays: 1826, toDays: 3652, minRatings: 25 },
-  { id: "todos", label: "De todos os tempos", hint: "Com pelo menos 40 avaliações, sem repetir os de cima", fromDays: null, toDays: null, minRatings: 40 },
+  { id: "1m", label: "Último mês", hint: "Lançados nos últimos 30 dias, com pelo menos 3 avaliações", days: 30, minRatings: 3 },
+  { id: "3m", label: "Último trimestre", hint: "Lançados nos últimos 3 meses, com pelo menos 3 avaliações, sem repetir os de cima", days: 91, minRatings: 3 },
+  { id: "6m", label: "Últimos 6 meses", hint: "Lançados nos últimos 6 meses, com pelo menos 3 avaliações, sem repetir os de cima", days: 182, minRatings: 3 },
+  { id: "1a", label: "Último ano", hint: "Lançados no último ano, com pelo menos 5 avaliações, sem repetir os de cima", days: 365, minRatings: 5 },
+  { id: "2a", label: "Últimos 2 anos", hint: "Lançados nos últimos 2 anos, com pelo menos 10 avaliações, sem repetir os de cima", days: 730, minRatings: 10 },
+  { id: "5a", label: "Últimos 5 anos", hint: "Lançados nos últimos 5 anos, com pelo menos 15 avaliações, sem repetir os de cima", days: 1826, minRatings: 15 },
+  { id: "10a", label: "Últimos 10 anos", hint: "Lançados nos últimos 10 anos, com pelo menos 25 avaliações, sem repetir os de cima", days: 3652, minRatings: 25 },
+  { id: "todos", label: "De todos os tempos", hint: "Com pelo menos 40 avaliações, sem repetir os de cima", days: null, minRatings: 40 },
 ] as const;
 export type PeriodId = (typeof PERIODS)[number]["id"];
 
