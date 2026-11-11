@@ -19,7 +19,7 @@ export default async function DiscoverPage({ searchParams }: PageProps<"/switch/
       list={list}
       games={games}
       backlog={backlog}
-      installed={Object.fromEntries(installed.filter((g) => g.igdbId != null).map((g) => [g.igdbId!, { id: g.id, sizeMb: g.sizeMb }]))}
+      installed={installed.map((g) => g.igdbId).filter((x): x is number => x != null)}
       switchTagId={tagId}
     />
   );

@@ -3,10 +3,9 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Gamepad2 } from "lucide-react";
 import { LISTS, type DiscoverGame, type ListId } from "@/lib/discover-lists";
 import { ptGenre } from "@/lib/genres";
-import { InstallChip, type Installed } from "./install-dialog";
 import { GUTTER } from "./rail";
 import { BacklogButton, ShotCover, useBacklogToggle, type BacklogRef } from "./shot-cover";
 
@@ -17,28 +16,21 @@ export function DiscoverView({
   list,
   games,
   backlog,
-  installed: initialInstalled,
+  installed: installedIds,
   switchTagId,
 }: {
   list: ListId;
   games: DiscoverGame[];
   backlog: Record<number, BacklogRef>;
-  installed: Record<number, Installed>;
+  installed: number[];
   switchTagId: string | null;
 }) {
   const { owned, busy, toggle } = useBacklogToggle(backlog, switchTagId);
-  const [installed, setInstalled] = useState(initialInstalled);
-  const setOne = (igdbId: number, next: Installed | null) =>
-    setInstalled((m) => {
-      const n = { ...m };
-      if (next) n[igdbId] = next;
-      else delete n[igdbId];
-      return n;
-    });
+  const installed = useMemo(() => new Set(installedIds), [installedIds]);
   const [hideMine, setHideMine] = useState(false);
   const meta = LISTS.find((l) => l.id === list)!;
   const visible = useMemo(
-    () => (hideMine ? games.filter((g) => !installed[g.igdbId] && !owned[g.igdbId]) : games),
+    () => (hideMine ? games.filter((g) => !installed.has(g.igdbId) && !owned[g.igdbId]) : games),
     [games, hideMine, installed, owned],
   );
 
@@ -90,6 +82,11 @@ export function DiscoverView({
                     #{rank}
                     {g.rating != null && list !== "soon" && <span className="text-white/70"> · ★ {g.rating}</span>}
                   </span>
+                  {installed.has(g.igdbId) && (
+                    <span className="flex items-center gap-1 rounded-full bg-success/90 px-2 py-0.5 text-[11px] font-semibold text-black">
+                      <Gamepad2 size={11} /> Instalado
+                    </span>
+                  )}
                 </div>
               )}
             />
@@ -106,9 +103,6 @@ export function DiscoverView({
                 {g.title}
               </p>
               <p className="mt-0.5 truncate text-[11px] text-text-3">{[when, g.genres[0] && ptGenre(g.genres[0])].filter(Boolean).join(" · ")}</p>
-              <div className="mt-2">
-                <InstallChip game={{ igdbId: g.igdbId, title: g.title, coverUrl: g.coverUrl }} installed={installed[g.igdbId] ?? null} onChange={(next) => setOne(g.igdbId, next)} />
-              </div>
             </div>
           );
         })}
