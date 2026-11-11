@@ -97,7 +97,7 @@ function Menu({
   onHideAll: (item: LiteItem, p: ViewPlatform) => void;
 }) {
   const router = useRouter();
-  const { items, installed } = useBacklog();
+  const { items, installed, optimistic } = useBacklog();
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: x, top: y });
   const [busy, setBusy] = useState<string | null>(null);
@@ -135,6 +135,12 @@ function Menu({
       window.removeEventListener("resize", onClose);
     };
   }, [onClose]);
+
+  // Muda na tela na hora (o card some ou troca de grupo) e fecha o menu; se o servidor falhar, volta como estava
+  function fast(itemId: string, patch: Partial<LiteItem> | null, action: () => Promise<unknown>) {
+    onClose();
+    optimistic(itemId, patch, action).catch(() => {});
+  }
 
   function run(id: string, action: () => Promise<unknown>) {
     setBusy(id);
@@ -177,9 +183,9 @@ function Menu({
             id="pin"
             icon={item.pinned ? <HeartOff size={15} /> : <Heart size={15} className="text-danger" />}
             label={item.pinned ? "Tirar da prioridade" : "Priorizar (Quero muito)"}
-            onClick={() => run("pin", () => togglePin(item.id))}
+            onClick={() => fast(item.id, { pinned: !item.pinned }, () => togglePin(item.id))}
           />
-          <Row busy={busy} id="done" icon={<Trophy size={15} />} label="Marcar como zerado" onClick={() => run("done", () => markDone(item.id))} />
+          <Row busy={busy} id="done" icon={<Trophy size={15} />} label="Marcar como zerado" onClick={() => fast(item.id, null, () => markDone(item.id))} />
         </>
       ) : game.done ? (
         <p className="flex items-center gap-2.5 px-2.5 py-2 text-[13.5px] text-text-3">
@@ -223,10 +229,10 @@ function Menu({
                 icon={hidden ? <Eye size={15} /> : <EyeOff size={15} />}
                 label={hidden ? `Mostrar no ${p}` : `Esconder do ${p}`}
                 onClick={() => {
-                  if (hidden) return run(`hide-${p}`, () => setHiddenPlatforms(item.id, item.hiddenPlatforms.filter((x) => x !== p)));
+                  const next = hidden ? item.hiddenPlatforms.filter((x) => x !== p) : [...item.hiddenPlatforms, p];
                   // Era a última plataforma em que ele aparece: pergunta antes
-                  if (visibleOn(item).every((x) => x === p)) return onHideAll(item, p);
-                  run(`hide-${p}`, () => setHiddenPlatforms(item.id, [...item.hiddenPlatforms, p]));
+                  if (!hidden && visibleOn(item).every((x) => x === p)) return onHideAll(item, p);
+                  fast(item.id, { hiddenPlatforms: next }, () => setHiddenPlatforms(item.id, next));
                 }}
               />
             );
@@ -245,7 +251,7 @@ function Menu({
           router.push(item ? `/item/${item.id}` : game.itemId ? `/item/${game.itemId}` : `/jogo/${game.igdbId}`);
         }}
       />
-      {item && <Row busy={busy} id="remove" danger icon={<Trash2 size={15} />} label="Tirar do backlog" onClick={() => run("remove", () => deleteItem(item.id))} />}
+      {item && <Row busy={busy} id="remove" danger icon={<Trash2 size={15} />} label="Tirar do backlog" onClick={() => fast(item.id, null, () => deleteItem(item.id))} />}
       {error && <p className="px-2.5 pb-1.5 pt-1 text-[12px] text-danger">Não deu certo. Tenta de novo.</p>}
     </motion.div>,
     document.body,
@@ -293,21 +299,13 @@ function Sep() {
 // Esconder da última plataforma em que o jogo aparece = ele some das listas. Confirma e tira do backlog,
 // ou deixa mostrar no outro console (se o jogo sai nele e estava escondido lá).
 function HideAllDialog({ item, platform, onClose }: { item: LiteItem; platform: ViewPlatform; onClose: () => void }) {
-  const [busy, setBusy] = useState<"other" | "remove" | null>(null);
-  const [error, setError] = useState(false);
+  const { optimistic } = useBacklog();
   const other = VIEW_PLATFORMS.find((p) => p !== platform && item.platforms.includes(p));
 
-  async function act(kind: "other" | "remove") {
-    setBusy(kind);
-    setError(false);
-    try {
-      if (kind === "remove") await deleteItem(item.id);
-      else await setHiddenPlatforms(item.id, [platform]);
-      onClose();
-    } catch {
-      setError(true);
-      setBusy(null);
-    }
+  function act(kind: "other" | "remove") {
+    onClose();
+    if (kind === "remove") optimistic(item.id, null, () => deleteItem(item.id)).catch(() => {});
+    else optimistic(item.id, { hiddenPlatforms: [platform] }, () => setHiddenPlatforms(item.id, [platform])).catch(() => {});
   }
 
   return (
@@ -322,27 +320,24 @@ function HideAllDialog({ item, platform, onClose }: { item: LiteItem; platform: 
             {other ? `Ele também sai para ${other}, onde está escondido.` : `Ele não sai para ${platform === "PC" ? "Switch" : "PC"}.`} Tirar do backlog?
           </p>
         </div>
-        {error && <p className="text-[13px] text-danger">Não deu certo. Tenta de novo.</p>}
         <div className="space-y-2">
           {other && (
             <button
               type="button"
               onClick={() => act("other")}
-              disabled={!!busy}
               className="btn-accent tap flex h-11 w-full items-center justify-center gap-2 rounded-full text-[15px] font-semibold disabled:opacity-50"
             >
-              {busy === "other" ? <Loader2 size={17} className="animate-spin" /> : <Eye size={17} />} Mostrar só no {other}
+              <Eye size={17} /> Mostrar só no {other}
             </button>
           )}
           <button
             type="button"
             onClick={() => act("remove")}
-            disabled={!!busy}
             className="tap flex h-11 w-full items-center justify-center gap-2 rounded-full bg-danger/15 text-[15px] font-semibold text-danger disabled:opacity-50"
           >
-            {busy === "remove" ? <Loader2 size={17} className="animate-spin" /> : <Trash2 size={16} />} Sim, tirar do backlog
+            <Trash2 size={16} /> Sim, tirar do backlog
           </button>
-          <button type="button" onClick={onClose} disabled={!!busy} className="glass tap flex h-11 w-full items-center justify-center rounded-full text-[15px] font-medium">
+          <button type="button" onClick={onClose} className="glass tap flex h-11 w-full items-center justify-center rounded-full text-[15px] font-medium">
             Cancelar
           </button>
         </div>

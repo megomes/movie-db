@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { ArrowDownAZ, Baby, Check, ChevronDown, ChevronRight, Clock, Compass, HardDrive, Plus, Search, Shuffle, Sparkles, Star, X } from "lucide-react";
 import { COLLECTIONS, FAMILY_LIST } from "@/lib/collections";
 import type { Kind } from "@/lib/db/schema";
@@ -41,6 +41,8 @@ const shortName = (n: string) => n.replace(/^Amazon /, "").replace(/ (Standard|B
 // Plataformas que viram filtro na aba Jogos (vêm do IGDB); a aba abre no PC
 const PLATFORM_FILTERS = ["PC", "Switch"] as const;
 const DEFAULT_GAME_FILTER = "plat:PC";
+// Mola dos cards se reorganizando na grade
+const CARD_SPRING = { type: "spring", stiffness: 420, damping: 38, mass: 0.8 } as const;
 
 function countBy(items: LiteItem[], pick: (i: LiteItem) => string[], label: (v: string) => string, limit = 14): TagOption[] {
   const m = new Map<string, number>();
@@ -376,6 +378,8 @@ export function ListBrowser({
         ))}
       </div>
 
+      {/* Tirar, zerar, priorizar ou esconder: o card sai/troca de grupo e o resto desliza para o lugar */}
+      <LayoutGroup>
       <div className="space-y-10 pt-3">
         {sections.map((s) => (
           <section key={s.key}>
@@ -403,11 +407,22 @@ export function ListBrowser({
               </div>
             )}
             <div className={`grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 lg:gap-5 2xl:grid-cols-8 ${GUTTER}`}>
-              {s.items.map((i, idx) => (
-                <div key={i.id} className="rise" style={{ animationDelay: `${Math.min(idx, 18) * 20}ms` }}>
-                  <Poster item={i} morph={!noMorphIds?.has(i.id)} eager={idx < 12} installed={gameGroups ? installedLabel(i) : undefined} />
-                </div>
-              ))}
+              <AnimatePresence mode="popLayout" initial={false}>
+                {s.items.map((i, idx) => (
+                  <motion.div
+                    key={i.id}
+                    layout="position"
+                    layoutId={gameGroups ? `card-${i.id}` : undefined}
+                    exit={{ opacity: 0, scale: 0.85, transition: { duration: 0.2 } }}
+                    transition={CARD_SPRING}
+                  >
+                    {/* A entrada (rise) fica num elemento interno: o "both" dela prenderia o transform do layout */}
+                    <div className="rise" style={{ animationDelay: `${Math.min(idx, 18) * 20}ms` }}>
+                      <Poster item={i} morph={!noMorphIds?.has(i.id)} eager={idx < 12} installed={gameGroups ? installedLabel(i) : undefined} />
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
               {s.extra?.map((r, idx) => (
                 <div key={r.id} className="rise" style={{ animationDelay: `${Math.min(s.items.length + idx, 18) * 20}ms` }}>
                   <InstalledCard row={r} label={(installedBy.get(r.igdbId) ?? [r]).map((x) => `${x.platform === "pc" ? "PC" : "Switch"} ${formatSize(x.sizeMb)}`).join(" · ")} />
@@ -417,6 +432,7 @@ export function ListBrowser({
           </section>
         ))}
       </div>
+      </LayoutGroup>
       {!sections.length && <p className="px-4 py-24 text-center text-text-2">Nada por aqui com esses filtros.</p>}
 
       {family && (!q || family.length > 0) && (

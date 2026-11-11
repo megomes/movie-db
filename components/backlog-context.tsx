@@ -16,6 +16,11 @@ type Ctx = {
   shared: Shared[];
   doneCount: number;
   family: LiteItem[];
+  /**
+   * Muda um item na tela antes do servidor responder (null = some da lista), roda a ação e desfaz se ela falhar.
+   * A lista não recarrega nem perde o lugar: o card some/muda na hora e o resto se reorganiza.
+   */
+  optimistic: (id: string, patch: Partial<LiteItem> | null, action: () => Promise<unknown>) => Promise<void>;
   /** Jogos instalados (Switch e PC), por igdbId */
   installed: InstalledLite[];
   tagsFor: (kind: Kind) => TagLite[];
@@ -31,7 +36,7 @@ const BacklogContext = createContext<Ctx | null>(null);
 
 export function BacklogProvider({
   children,
-  items,
+  items: serverItems,
   me,
   people,
   myProviders,
@@ -55,6 +60,45 @@ export function BacklogProvider({
   reviewCount: number;
 }) {
   const [drawOpen, setDrawOpen] = useState(false);
+
+  // Mudanças locais por item, até o servidor mandar a lista já com elas
+  const [overrides, setOverrides] = useState<Record<string, Partial<LiteItem> | null>>({});
+  const [lastItems, setLastItems] = useState(serverItems);
+  if (lastItems !== serverItems) {
+    setLastItems(serverItems);
+    setOverrides((prev) => {
+      const byId = new Map(serverItems.map((i) => [i.id, i]));
+      const next: typeof prev = {};
+      for (const [id, patch] of Object.entries(prev)) {
+        const server = byId.get(id);
+        const pending = patch === null ? !!server : !!server && Object.entries(patch).some(([k, v]) => JSON.stringify(server[k as keyof LiteItem]) !== JSON.stringify(v));
+        if (pending) next[id] = patch;
+      }
+      return next;
+    });
+  }
+  const items = useMemo(() => {
+    if (!Object.keys(overrides).length) return serverItems;
+    const out: LiteItem[] = [];
+    for (const i of serverItems) {
+      if (!(i.id in overrides)) out.push(i);
+      else if (overrides[i.id]) out.push({ ...i, ...overrides[i.id] });
+    }
+    return out;
+  }, [serverItems, overrides]);
+  const optimistic = useCallback(async (id: string, patch: Partial<LiteItem> | null, action: () => Promise<unknown>) => {
+    setOverrides((o) => ({ ...o, [id]: patch }));
+    try {
+      await action();
+    } catch (e) {
+      setOverrides((o) => {
+        const n = { ...o };
+        delete n[id];
+        return n;
+      });
+      throw e;
+    }
+  }, []);
   const [searchOpen, setSearchOpen] = useState(false);
 
   // Cor da arte em destaque tinge o topo da página (ver .ambient em globals.css)
@@ -86,6 +130,7 @@ export function BacklogProvider({
       shared,
       doneCount,
       family,
+      optimistic,
       installed,
       tagsFor: (kind: Kind) => tags.filter((t) => t.kind === kind),
       tagName: (id: string) => byId.get(id),
@@ -95,7 +140,7 @@ export function BacklogProvider({
       setSearchOpen,
       setAmbient,
     };
-  }, [items, me, people, myProviders, reviewCount, tags, shared, doneCount, family, installed, drawOpen, searchOpen, setAmbient]);
+  }, [items, me, people, myProviders, reviewCount, tags, shared, doneCount, family, optimistic, installed, drawOpen, searchOpen, setAmbient]);
   return <BacklogContext.Provider value={value}>{children}</BacklogContext.Provider>;
 }
 
