@@ -15,7 +15,7 @@ async function getToken() {
 
 // IGDB limita a 4 req/s
 let last = 0;
-async function igdb<T>(endpoint: string, body: string) {
+export async function igdb<T>(endpoint: string, body: string) {
   const wait = last + 260 - Date.now();
   if (wait > 0) await sleep(wait);
   last = Date.now();
@@ -26,13 +26,13 @@ async function igdb<T>(endpoint: string, body: string) {
   });
 }
 
-const img = (id: string | undefined, size: string) =>
+export const img = (id: string | undefined, size: string) =>
   id ? `https://images.igdb.com/igdb/image/upload/t_${size}/${id}.jpg` : null;
 
 export const PLATFORM = { PC: 6, SWITCH: 130, SWITCH2: 508 } as const;
 
 // Só jogos principais, remakes, remasters, expansões standalone, ports
-const GAME_TYPES = "(0,4,8,9,10,11)";
+export const GAME_TYPES = "(0,4,8,9,10,11)";
 
 type SearchGame = {
   id: number;

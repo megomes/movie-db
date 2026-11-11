@@ -1,7 +1,7 @@
 import "server-only";
 import { and, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { asc } from "drizzle-orm";
-import { db, items, profiles, tags, type Item } from "@/lib/db";
+import { db, items, profiles, switchGames, tags, type Item } from "@/lib/db";
 import { hoursOf } from "@/lib/kinds";
 
 export type Person = { userId: string; name: string | null; image: string | null; email: string };
@@ -159,4 +159,24 @@ export async function listShared(meId: string): Promise<Shared[]> {
       const pairs = mine.filter((m) => byKey.has(workKey(m)));
       return { userId: p.userId, name: p.name, image: p.image, total: theirs.length, count: pairs.length, mineIds: pairs.map((m) => m.id), theirIds: pairs.map((m) => byKey.get(workKey(m))!) };
     });
+}
+
+// Jogos do backlog (inclusive zerados) por ID do IGDB: marca quais já estão lá
+export async function backlogByIgdb(ownerId: string, igdbIds: number[]) {
+  if (!igdbIds.length) return {};
+  const rows = await db
+    .select({ id: items.id, igdbId: items.igdbId, doneAt: items.doneAt })
+    .from(items)
+    .where(and(eq(items.ownerId, ownerId), eq(items.kind, "game"), inArray(items.igdbId, igdbIds)));
+  return Object.fromEntries(rows.map((r) => [r.igdbId!, { id: r.id, done: !!r.doneAt }])) as Record<number, { id: string; done: boolean }>;
+}
+
+// Tag "Switch" da pessoa (jogos adicionados pelas páginas do Switch entram com ela)
+export async function switchTagId(ownerId: string) {
+  const [t] = await db.select({ id: tags.id }).from(tags).where(and(eq(tags.ownerId, ownerId), eq(tags.kind, "game"), eq(tags.name, "Switch")));
+  return t?.id ?? null;
+}
+
+export async function listSwitchGames(ownerId: string) {
+  return db.select().from(switchGames).where(eq(switchGames.ownerId, ownerId)).orderBy(desc(switchGames.sizeMb));
 }
