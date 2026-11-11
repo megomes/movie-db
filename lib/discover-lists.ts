@@ -19,6 +19,4 @@ export type DiscoverGame = {
   rating: number | null;
   ratingCount: number;
   genres: string[];
-  /** Só roda no Switch 2 */
-  switch2Only: boolean;
 };

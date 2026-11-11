@@ -87,7 +87,6 @@ export function DiscoverView({
                       <Gamepad2 size={11} /> Instalado
                     </span>
                   )}
-                  {g.switch2Only && <span className="rounded-full bg-danger/90 px-2 py-0.5 text-[11px] font-semibold text-white">Switch 2</span>}
                 </div>
               )}
             />

@@ -15,11 +15,11 @@ type Raw = {
   total_rating?: number;
   total_rating_count?: number;
   genres?: { name: string }[];
-  platforms?: number[];
 };
 
-const SWITCH = `(${PLATFORM.SWITCH},${PLATFORM.SWITCH2})`;
-const FIELDS = "fields name,first_release_date,cover.image_id,screenshots.image_id,total_rating,total_rating_count,genres.name,platforms";
+// Só o Switch original: jogos exclusivos do Switch 2 ficam de fora (as "Switch 2 Edition" também saem no Switch)
+const SWITCH = `(${PLATFORM.SWITCH})`;
+const FIELDS = "fields name,first_release_date,cover.image_id,screenshots.image_id,total_rating,total_rating_count,genres.name";
 const POPULARITY = { visits: 1, wantToPlay: 2 } as const;
 const LIMIT = 100;
 
@@ -35,7 +35,6 @@ function toGame(g: Raw): DiscoverGame {
     rating: g.total_rating ? Math.round(g.total_rating) : null,
     ratingCount: g.total_rating_count ?? 0,
     genres: (g.genres ?? []).map((x) => x.name),
-    switch2Only: !!g.platforms?.includes(PLATFORM.SWITCH2) && !g.platforms.includes(PLATFORM.SWITCH),
   };
 }
 
@@ -83,4 +82,4 @@ async function fetchList(id: ListId): Promise<DiscoverGame[]> {
 }
 
 // Atualiza a cada 12h: as listas mudam devagar e o IGDB limita a 4 req/s
-export const getDiscoverList = unstable_cache(fetchList, ["discover-switch-v1"], { revalidate: 60 * 60 * 12 });
+export const getDiscoverList = unstable_cache(fetchList, ["discover-switch-v2"], { revalidate: 60 * 60 * 12 });
