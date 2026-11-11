@@ -1,5 +1,5 @@
 import { DiscoverView } from "@/components/discover-view";
-import { getDiscoverList, isListId, isPeriodId, LISTS } from "@/lib/discover";
+import { getDiscoverGroups, isListId, LISTS } from "@/lib/discover";
 import { backlogByIgdb, listSwitchGames, switchTagId } from "@/lib/queries";
 import { requireUser } from "@/lib/session";
 
@@ -9,17 +9,15 @@ export default async function DiscoverPage({ searchParams }: PageProps<"/switch/
   const user = await requireUser();
   const sp = await searchParams;
   const list = isListId(sp.lista) ? sp.lista : LISTS[0].id;
-  const period = list === "top" && isPeriodId(sp.periodo) ? sp.periodo : "todos";
 
-  const [games, installed, tagId] = await Promise.all([getDiscoverList(list, period), listSwitchGames(user.id), switchTagId(user.id)]);
-  const backlog = await backlogByIgdb(user.id, games.map((g) => g.igdbId));
+  const [groups, installed, tagId] = await Promise.all([getDiscoverGroups(list), listSwitchGames(user.id), switchTagId(user.id)]);
+  const backlog = await backlogByIgdb(user.id, groups.flatMap((g) => g.games.map((x) => x.igdbId)));
 
   return (
     <DiscoverView
-      key={`${list}-${period}`}
+      key={list}
       list={list}
-      period={period}
-      games={games}
+      groups={groups}
       backlog={backlog}
       installed={installed.map((g) => g.igdbId).filter((x): x is number => x != null)}
       switchTagId={tagId}

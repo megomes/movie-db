@@ -2,7 +2,7 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { GAME_TYPES, igdb, img, PLATFORM } from "@/lib/sources/igdb";
 
-import { PERIODS, type DiscoverGame, type ListId, type PeriodId } from "@/lib/discover-lists";
+import { PERIODS, type DiscoverGame, type DiscoverGroup, type ListId, type PeriodId } from "@/lib/discover-lists";
 
 export * from "@/lib/discover-lists";
 
@@ -60,7 +60,7 @@ async function fetchList(id: ListId, period: PeriodId = "todos"): Promise<Discov
   let rows: Raw[];
   switch (id) {
     case "top": {
-      const p = PERIODS.find((x) => x.id === period) ?? PERIODS[0];
+      const p = PERIODS.find((x) => x.id === period)!;
       const released = p.toDays == null ? "" : ` & first_release_date > ${now - p.toDays * 86400} & first_release_date <= ${now - p.fromDays * 86400}`;
       rows = await igdb<Raw[]>("games", `${FIELDS}; where ${where}${released} & total_rating_count >= ${p.minRatings}; sort total_rating desc; limit ${LIMIT};`);
       break;
@@ -86,3 +86,15 @@ async function fetchList(id: ListId, period: PeriodId = "todos"): Promise<Discov
 
 // Atualiza a cada 12h: as listas mudam devagar e o IGDB limita a 4 req/s
 export const getDiscoverList = unstable_cache(fetchList, ["discover-switch-v3"], { revalidate: 60 * 60 * 12 });
+
+// Lista pronta para a página: "Melhores" vem em grupos por data de lançamento (o de todos os tempos sem repetir os de cima)
+export async function getDiscoverGroups(id: ListId): Promise<DiscoverGroup[]> {
+  if (id !== "top") return [{ id, title: null, hint: null, games: await getDiscoverList(id) }];
+  const lists = await Promise.all(PERIODS.map((p) => getDiscoverList("top", p.id)));
+  const seen = new Set<number>();
+  return PERIODS.map((p, i) => {
+    const games = lists[i].filter((g) => !seen.has(g.igdbId));
+    for (const g of games) seen.add(g.igdbId);
+    return { id: p.id, title: p.label, hint: p.hint, games };
+  }).filter((g) => g.games.length);
+}

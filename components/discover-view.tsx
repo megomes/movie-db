@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { ArrowLeft, Gamepad2 } from "lucide-react";
-import { LISTS, PERIODS, type DiscoverGame, type ListId, type PeriodId } from "@/lib/discover-lists";
+import { LISTS, type DiscoverGroup, type ListId } from "@/lib/discover-lists";
 import { ptGenre } from "@/lib/genres";
 import { GUTTER } from "./rail";
 import { BacklogButton, ShotCover, useBacklogToggle, type BacklogRef } from "./shot-cover";
@@ -14,15 +14,13 @@ const dateFmt = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "short
 // Listas de jogos de Switch para descobrir o que jogar: passa o mouse para ver screenshots
 export function DiscoverView({
   list,
-  period,
-  games,
+  groups,
   backlog,
   installed: installedIds,
   switchTagId,
 }: {
   list: ListId;
-  period: PeriodId;
-  games: DiscoverGame[];
+  groups: DiscoverGroup[];
   backlog: Record<number, BacklogRef>;
   installed: number[];
   switchTagId: string | null;
@@ -31,11 +29,13 @@ export function DiscoverView({
   const installed = useMemo(() => new Set(installedIds), [installedIds]);
   const [hideMine, setHideMine] = useState(false);
   const meta = LISTS.find((l) => l.id === list)!;
-  const periodMeta = PERIODS.find((p) => p.id === period)!;
-  const hint = list === "top" ? periodMeta.hint : meta.hint;
-  const visible = useMemo(
-    () => (hideMine ? games.filter((g) => !installed.has(g.igdbId) && !owned[g.igdbId]) : games),
-    [games, hideMine, installed, owned],
+  const total = groups.reduce((n, g) => n + g.games.length, 0);
+  const sections = useMemo(
+    () =>
+      groups
+        .map((g) => ({ ...g, visible: hideMine ? g.games.filter((x) => !installed.has(x.igdbId) && !owned[x.igdbId]) : g.games }))
+        .filter((g) => g.visible.length),
+    [groups, hideMine, installed, owned],
   );
 
   return (
@@ -46,8 +46,7 @@ export function DiscoverView({
         </Link>
         <h1 className="text-[34px] font-bold leading-none tracking-tight lg:text-[52px]">Descobrir</h1>
         <p className="mt-2 text-[15px] text-text-2">
-          {list === "top" && period !== "todos" ? `Melhores · ${periodMeta.label.toLowerCase()}` : meta.label} no Switch ·{" "}
-          <span className="text-text-3">{hint}</span>
+          {meta.label} no Switch · <span className="text-text-3">{meta.hint}</span>
         </p>
       </header>
 
@@ -69,69 +68,66 @@ export function DiscoverView({
             Esconder o que já tenho
           </button>
         </div>
-        {/* Janela de lançamento: só nos Melhores */}
-        {list === "top" && (
-          <div className="no-scrollbar -mx-4 flex items-center gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-            <span className="shrink-0 pr-1 text-[11px] font-semibold uppercase tracking-wider text-white/40">Lançados</span>
-            {PERIODS.map((p) => (
-              <Link
-                key={p.id}
-                href={p.id === "todos" ? "/switch/descobrir?lista=top" : `/switch/descobrir?lista=top&periodo=${p.id}`}
-                scroll={false}
-                aria-current={period === p.id ? "page" : undefined}
-                className={`tap flex h-9 shrink-0 items-center rounded-full px-3.5 text-[13px] font-medium transition-colors ${period === p.id ? "btn-accent" : "glass text-white/75 hover:text-white"}`}
-              >
-                {p.label}
-              </Link>
-            ))}
-          </div>
-        )}
       </div>
 
-      <div className={`grid grid-cols-3 gap-x-3 gap-y-5 pt-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 lg:gap-x-5 lg:gap-y-7 2xl:grid-cols-8 ${GUTTER}`}>
-        {visible.map((g, idx) => {
-          const item = owned[g.igdbId] ?? null;
-          const rank = games.indexOf(g) + 1;
-          const when = list === "soon" ? (g.releaseDate ? dateFmt.format(new Date(g.releaseDate)) : "Sem data") : g.year;
-          const cover = (
-            <ShotCover
-              id={String(g.igdbId)}
-              title={g.title}
-              coverUrl={g.coverUrl}
-              screenshots={g.screenshots}
-              eager={idx < 12}
-              overlay={() => (
-                <div className="pointer-events-none absolute left-2 top-2 flex flex-col items-start gap-1">
-                  <span className="rounded-full bg-black/65 px-2 py-0.5 text-[11px] font-semibold tabular-nums ring-1 ring-white/10">
-                    #{rank}
-                    {g.rating != null && list !== "soon" && <span className="text-white/70"> · ★ {g.rating}</span>}
-                  </span>
-                  {installed.has(g.igdbId) && (
-                    <span className="flex items-center gap-1 rounded-full bg-success/90 px-2 py-0.5 text-[11px] font-semibold text-black">
-                      <Gamepad2 size={11} /> Instalado
-                    </span>
-                  )}
-                </div>
-              )}
-            />
-          );
-          return (
-            <div key={g.igdbId} className="rise" style={{ animationDelay: `${Math.min(idx, 18) * 20}ms` }}>
-              <div className="group relative">
-                <Link href={item ? `/item/${item.id}` : `/jogo/${g.igdbId}`} aria-label={g.title} className="block">
-                  {cover}
-                </Link>
-                {!item?.done && <BacklogButton on={!!item} busy={busy.has(g.igdbId)} onClick={() => toggle(g.igdbId)} />}
+      <div className="space-y-12 pt-3">
+        {sections.map((s) => (
+          <section key={s.id}>
+            {s.title && (
+              <div className={`mb-4 ${GUTTER}`}>
+                <h2 className="text-[20px] font-bold tracking-tight lg:text-[24px]">
+                  {s.title} <span className="text-[14px] font-semibold text-text-3">{s.visible.length}</span>
+                </h2>
+                {s.hint && <p className="mt-0.5 text-[13px] text-text-3">{s.hint}</p>}
               </div>
-              <p className="mt-2 truncate text-[13px] font-medium leading-tight" title={g.title}>
-                {g.title}
-              </p>
-              <p className="mt-0.5 truncate text-[11px] text-text-3">{[when, g.genres[0] && ptGenre(g.genres[0])].filter(Boolean).join(" · ")}</p>
+            )}
+            <div className={`grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 lg:gap-x-5 lg:gap-y-7 2xl:grid-cols-8 ${GUTTER}`}>
+              {s.visible.map((g, idx) => {
+                const item = owned[g.igdbId] ?? null;
+                const rank = s.games.indexOf(g) + 1;
+                const when = list === "soon" ? (g.releaseDate ? dateFmt.format(new Date(g.releaseDate)) : "Sem data") : g.year;
+                const cover = (
+                  <ShotCover
+                    id={String(g.igdbId)}
+                    title={g.title}
+                    coverUrl={g.coverUrl}
+                    screenshots={g.screenshots}
+                    eager={idx < 12}
+                    overlay={() => (
+                      <div className="pointer-events-none absolute left-2 top-2 flex flex-col items-start gap-1">
+                        <span className="rounded-full bg-black/65 px-2 py-0.5 text-[11px] font-semibold tabular-nums ring-1 ring-white/10">
+                          #{rank}
+                          {g.rating != null && list !== "soon" && <span className="text-white/70"> · ★ {g.rating}</span>}
+                        </span>
+                        {installed.has(g.igdbId) && (
+                          <span className="flex items-center gap-1 rounded-full bg-success/90 px-2 py-0.5 text-[11px] font-semibold text-black">
+                            <Gamepad2 size={11} /> Instalado
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  />
+                );
+                return (
+                  <div key={g.igdbId} className="rise" style={{ animationDelay: `${Math.min(idx, 18) * 20}ms` }}>
+                    <div className="group relative">
+                      <Link href={item ? `/item/${item.id}` : `/jogo/${g.igdbId}`} aria-label={g.title} className="block">
+                        {cover}
+                      </Link>
+                      {!item?.done && <BacklogButton on={!!item} busy={busy.has(g.igdbId)} onClick={() => toggle(g.igdbId)} />}
+                    </div>
+                    <p className="mt-2 truncate text-[13px] font-medium leading-tight" title={g.title}>
+                      {g.title}
+                    </p>
+                    <p className="mt-0.5 truncate text-[11px] text-text-3">{[when, g.genres[0] && ptGenre(g.genres[0])].filter(Boolean).join(" · ")}</p>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
+          </section>
+        ))}
       </div>
-      {!visible.length && <p className="px-4 py-24 text-center text-text-2">{games.length ? "Você já tem todos desta lista!" : period !== "todos" ? "Nenhum jogo com avaliações suficientes nesse período ainda." : "Não deu pra carregar esta lista agora."}</p>}
+      {!sections.length && <p className="px-4 py-24 text-center text-text-2">{total ? "Você já tem todos desta lista!" : "Não deu pra carregar esta lista agora."}</p>}
     </div>
   );
 }
