@@ -10,6 +10,8 @@ import { Cover } from "./cover";
 
 export type Installed = { id: string; sizeMb: number };
 export type InstallTarget = { igdbId: number; title: string; coverUrl: string | null };
+export type InstallPlatform = "switch" | "pc";
+const PLATFORM_LABEL: Record<InstallPlatform, string> = { switch: "Switch", pc: "PC" };
 
 export const toMb = (value: string, unit: "GB" | "MB") => {
   const n = Number(value.replace(",", "."));
@@ -89,11 +91,13 @@ export function InstallDialog({
   installed,
   onClose,
   onChange,
+  platform = "switch",
 }: {
   game: InstallTarget;
   installed: Installed | null;
   onClose: () => void;
   onChange: (next: Installed | null) => void;
+  platform?: InstallPlatform;
 }) {
   const start = installed ? fromMb(installed.sizeMb) : { value: "", unit: "GB" as const };
   const [size, setSize] = useState(start.value);
@@ -110,7 +114,7 @@ export function InstallDialog({
         await removeSwitchGame(installed.id);
         onChange(null);
       } else if (mb) {
-        const row = await addSwitchGame(game.igdbId, game.title, mb, game.coverUrl);
+        const row = await addSwitchGame(game.igdbId, game.title, mb, game.coverUrl, platform);
         onChange({ id: row.id, sizeMb: row.sizeMb });
       }
       onClose();
@@ -121,7 +125,7 @@ export function InstallDialog({
   }
 
   return (
-    <Sheet label={installed ? "Instalado no Switch" : "Instalar no Switch"} onClose={onClose}>
+    <Sheet label={`${installed ? "Instalado no" : "Instalar no"} ${PLATFORM_LABEL[platform]}`} onClose={onClose}>
       <form
         className="space-y-4 px-5 pb-5 pt-2"
         onSubmit={(e) => {

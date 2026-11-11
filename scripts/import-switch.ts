@@ -6,7 +6,7 @@
  *   --dry  -> só mostra o que faria
  */
 import fs from "node:fs";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, profiles, switchGames } from "../lib/db";
 import { getIgdbScreenshots, PLATFORM, searchIgdb } from "../lib/sources/igdb";
 import { normalize, similarity } from "../lib/sources/http";
@@ -60,7 +60,8 @@ async function main() {
   const final = rows.map((r) => ({ ...r, screenshots: (r.igdbId != null && shots.get(r.igdbId)) || [] }));
   console.log(`Screenshots: ${final.filter((r) => r.screenshots.length).length} jogos`);
   if (DRY) return;
-  await db.delete(switchGames).where(eq(switchGames.ownerId, owner.userId));
+  // Troca só a lista do Switch (os instalados no PC ficam)
+  await db.delete(switchGames).where(and(eq(switchGames.ownerId, owner.userId), eq(switchGames.platform, "switch")));
   await db.insert(switchGames).values(final);
   console.log(`Gravados ${rows.length}`);
 }

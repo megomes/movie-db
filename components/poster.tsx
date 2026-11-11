@@ -1,16 +1,20 @@
+/* eslint-disable @next/next/no-img-element -- screenshots vêm direto do CDN do IGDB */
 "use client";
 
 import Link from "next/link";
+import { useRef, useState } from "react";
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
-import { Heart } from "lucide-react";
+import { HardDrive, Heart } from "lucide-react";
 import type { CoverSize } from "@/lib/img";
 import { accessFor, formatMinutes, KIND_META, scoreLabel } from "@/lib/kinds";
 import type { LiteItem } from "@/lib/queries";
 import { useBacklog } from "./backlog-context";
 import { Cover } from "./cover";
+import { useGameMenu } from "./game-menu";
 import { KIND_ICONS } from "./kind-icon";
 
 // Pôster interativo: inclina com o mouse (desktop), mostra nota e revela infos no hover.
+// Jogo com screenshots: em vez de inclinar, o mouse passeia pelas screenshots; botão direito abre o menu do jogo.
 export function Poster({
   item,
   morph = false,
@@ -19,6 +23,7 @@ export function Poster({
   href,
   showBadge = true,
   kindIcon = false,
+  installed,
 }: {
   item: LiteItem;
   morph?: boolean;
@@ -28,8 +33,15 @@ export function Poster({
   showBadge?: boolean;
   /** Ícone do tipo no selo (listas que misturam filmes, jogos, livros…) */
   kindIcon?: boolean;
+  /** Selo de instalado, ex.: "Switch · 4,6 GB" */
+  installed?: string;
 }) {
   const { myProviders } = useBacklog();
+  const openMenu = useGameMenu();
+  const game = item.kind === "game";
+  const shots = game ? (item.shots ?? []) : [];
+  const [shot, setShot] = useState<number | null>(null);
+  const preloaded = useRef(false);
   const mx = useMotionValue(0);
   const my = useMotionValue(0);
   const rx = useSpring(useTransform(my, [-0.5, 0.5], [7, -7]), { stiffness: 260, damping: 20 });
@@ -45,13 +57,24 @@ export function Poster({
       href={href ?? `/item/${item.id}`}
       className="group relative block outline-none hover:z-10"
       aria-label={item.title}
+      onContextMenu={game ? (e) => openMenu(e, { igdbId: item.igdbId, title: item.title, coverUrl: item.coverUrl, itemId: item.id }) : undefined}
+      onPointerEnter={(e) => {
+        if (e.pointerType !== "mouse" || !shots.length || preloaded.current) return;
+        preloaded.current = true;
+        for (const src of shots) new Image().src = src;
+      }}
       onPointerMove={(e) => {
         if (e.pointerType !== "mouse") return;
         const r = e.currentTarget.getBoundingClientRect();
+        if (shots.length) {
+          setShot(Math.min(shots.length - 1, Math.max(0, Math.floor(((e.clientX - r.left) / r.width) * shots.length))));
+          return;
+        }
         mx.set((e.clientX - r.left) / r.width - 0.5);
         my.set((e.clientY - r.top) / r.height - 0.5);
       }}
       onPointerLeave={() => {
+        setShot(null);
         mx.set(0);
         my.set(0);
       }}
@@ -67,6 +90,17 @@ export function Poster({
             Dentro da peça inclinada nada de backdrop-filter nem mix-blend: no Firefox isso faz piscar. */}
         <div className="relative overflow-hidden rounded-2xl [clip-path:inset(0_round_1rem)]">
           <Cover item={item} size={size} eager={eager} morph={morph} rounded="rounded-2xl" />
+          {shot != null && (
+            <>
+              <img src={shots[shot]} alt="" className="absolute inset-0 h-full w-full object-cover" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/70 to-transparent" />
+              <div className="pointer-events-none absolute inset-x-2 bottom-2 flex gap-1">
+                {shots.map((_, i) => (
+                  <span key={i} className={`h-[3px] flex-1 rounded-full transition-colors ${i === shot ? "bg-white" : "bg-white/30"}`} />
+                ))}
+              </div>
+            </>
+          )}
 
           {/* Reflexo que acompanha o mouse */}
           <motion.div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" style={{ background: glare }} />
@@ -82,10 +116,15 @@ export function Poster({
               <Heart size={12} className="fill-white text-white" />
             </span>
           )}
+          {installed && shot == null && (
+            <span className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-success/90 px-2 py-0.5 text-[10.5px] font-semibold text-black group-hover:opacity-0">
+              <HardDrive size={10} /> {installed}
+            </span>
+          )}
           {access.tier === "mine" && <span className="absolute bottom-2 right-2 h-2.5 w-2.5 rounded-full bg-success ring-2 ring-black/50 group-hover:opacity-0" />}
 
           {/* Infos no hover (desktop): degradê cobre o pôster inteiro; só o texto desliza */}
-          <div className="pointer-events-none absolute inset-0 hidden flex-col justify-end bg-[linear-gradient(to_top,rgb(0_0_0/0.96)_0%,rgb(0_0_0/0.82)_32%,rgb(0_0_0/0.35)_62%,transparent_85%)] p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100 [@media(hover:hover)]:flex">
+          <div className={`pointer-events-none absolute inset-0 hidden flex-col justify-end ${shot != null ? "opacity-0!" : ""} bg-[linear-gradient(to_top,rgb(0_0_0/0.96)_0%,rgb(0_0_0/0.82)_32%,rgb(0_0_0/0.35)_62%,transparent_85%)] p-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100 [@media(hover:hover)]:flex`}>
             <div className="translate-y-2 transition-transform duration-300 group-hover:translate-y-0">
               <p className="text-[13px] font-semibold leading-tight line-clamp-2">{item.title}</p>
               <p className="mt-1 text-[11px] text-white/65">{[item.year, length].filter(Boolean).join(" · ")}</p>

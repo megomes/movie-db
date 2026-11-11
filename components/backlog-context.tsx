@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { Kind } from "@/lib/db/schema";
-import type { LiteItem, Person, Shared, TagLite } from "@/lib/queries";
+import type { InstalledLite, LiteItem, Person, Shared, TagLite } from "@/lib/queries";
 
 export type Viewer = { id: string; name: string | null; email: string; image: string | null };
 
@@ -16,6 +16,8 @@ type Ctx = {
   shared: Shared[];
   doneCount: number;
   family: LiteItem[];
+  /** Jogos instalados (Switch e PC), por igdbId */
+  installed: InstalledLite[];
   tagsFor: (kind: Kind) => TagLite[];
   tagName: (id: string) => string | undefined;
   drawOpen: boolean;
@@ -38,8 +40,10 @@ export function BacklogProvider({
   shared,
   doneCount,
   family,
+  installed,
 }: {
   children: React.ReactNode;
+  installed: InstalledLite[];
   tags: TagLite[];
   shared: Shared[];
   doneCount: number;
@@ -82,6 +86,7 @@ export function BacklogProvider({
       shared,
       doneCount,
       family,
+      installed,
       tagsFor: (kind: Kind) => tags.filter((t) => t.kind === kind),
       tagName: (id: string) => byId.get(id),
       drawOpen,
@@ -90,7 +95,7 @@ export function BacklogProvider({
       setSearchOpen,
       setAmbient,
     };
-  }, [items, me, people, myProviders, reviewCount, tags, shared, doneCount, family, drawOpen, searchOpen, setAmbient]);
+  }, [items, me, people, myProviders, reviewCount, tags, shared, doneCount, family, installed, drawOpen, searchOpen, setAmbient]);
   return <BacklogContext.Provider value={value}>{children}</BacklogContext.Provider>;
 }
 

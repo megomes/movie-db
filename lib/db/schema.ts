@@ -159,12 +159,14 @@ export const tags = pgTable(
 
 export type Tag = typeof tags.$inferSelect;
 
-// Jogos instalados no Switch de cada pessoa (com o tamanho, que as APIs não dão)
+// Jogos instalados de cada pessoa, no Switch ou no PC (com o tamanho, que as APIs não dão)
 export const switchGames = pgTable(
   "switch_games",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     ownerId: text("owner_id").notNull(),
+    // "switch" ou "pc"
+    platform: text("platform").notNull().default("switch"),
     title: text("title").notNull(),
     sizeMb: integer("size_mb").notNull(),
     igdbId: integer("igdb_id"),
@@ -173,7 +175,7 @@ export const switchGames = pgTable(
     screenshots: text("screenshots").array().notNull().default([]),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("switch_games_owner_title").on(t.ownerId, t.title)],
+  (t) => [uniqueIndex("switch_games_owner_platform_title").on(t.ownerId, t.platform, t.title)],
 );
 
 export type SwitchGame = typeof switchGames.$inferSelect;

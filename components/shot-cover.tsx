@@ -1,9 +1,10 @@
 /* eslint-disable @next/next/no-img-element -- screenshots vêm direto do CDN do IGDB */
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { Check, Loader2, Plus } from "lucide-react";
 import { addItem, deleteItem } from "@/app/actions";
+import { useBacklog } from "./backlog-context";
 import { Cover } from "./cover";
 
 // Capa de jogo que, com o mouse em cima, percorre as screenshots pela posição horizontal
@@ -86,24 +87,30 @@ export function BacklogButton({ on, busy, onClick }: { on: boolean; busy: boolea
 
 export type BacklogRef = { id: string; done: boolean };
 
-// Estado "está no backlog?" por jogo do IGDB, com pôr/tirar otimista (jogos entram com a tag Switch)
+// Estado "está no backlog?" por jogo do IGDB, com pôr/tirar otimista. A base é o backlog do app (que o menu de
+// botão direito também muda) mais os zerados que a página mandou; as mudanças locais valem até o backlog atualizar.
 export function useBacklogToggle(initial: Record<number, BacklogRef>) {
-  const [owned, setOwned] = useState(initial);
-  const [lastInitial, setLastInitial] = useState(initial);
-  if (lastInitial !== initial) {
-    setLastInitial(initial);
-    setOwned(initial);
+  const { items } = useBacklog();
+  const [overrides, setOverrides] = useState<Record<number, BacklogRef | null>>({});
+  const [lastItems, setLastItems] = useState(items);
+  if (lastItems !== items) {
+    setLastItems(items);
+    setOverrides({});
   }
+  const owned = useMemo(() => {
+    const o: Record<number, BacklogRef> = {};
+    for (const [k, v] of Object.entries(initial)) if (v.done) o[Number(k)] = v;
+    for (const i of items) if (i.kind === "game" && i.igdbId != null) o[i.igdbId] = { id: i.id, done: false };
+    for (const [k, v] of Object.entries(overrides)) {
+      if (v) o[Number(k)] = v;
+      else delete o[Number(k)];
+    }
+    return o;
+  }, [initial, items, overrides]);
   const [busy, setBusy] = useState<Set<number>>(new Set());
   const [, startTransition] = useTransition();
 
-  const set = (igdbId: number, ref: BacklogRef | null) =>
-    setOwned((o) => {
-      const n = { ...o };
-      if (ref) n[igdbId] = ref;
-      else delete n[igdbId];
-      return n;
-    });
+  const set = (igdbId: number, ref: BacklogRef | null) => setOverrides((o) => ({ ...o, [igdbId]: ref }));
   const mark = (igdbId: number, on: boolean) =>
     setBusy((b) => {
       const n = new Set(b);

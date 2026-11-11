@@ -220,37 +220,36 @@ export async function sendTestPush() {
 }
 
 // Biblioteca do Switch: pôr um jogo (com o tamanho que ocupa) ou tirar
-export async function addSwitchGame(igdbId: number, title: string, sizeMb: number, coverUrl: string | null) {
+// Registra um jogo instalado (Switch ou PC) com o tamanho
+export async function addSwitchGame(igdbId: number, title: string, sizeMb: number, coverUrl: string | null, platform: "switch" | "pc" = "switch") {
   const user = await requireUser();
   const size = Math.round(sizeMb);
   const name = title.trim();
-  if (!Number.isInteger(igdbId) || !name || !Number.isFinite(size) || size <= 0 || size > 1024 * 1024) throw new Error("Dados inválidos");
+  if ((platform !== "switch" && platform !== "pc") || !Number.isInteger(igdbId) || !name || !Number.isFinite(size) || size <= 0 || size > 1024 * 1024) throw new Error("Dados inválidos");
   // Já instalado (mesmo que com outro título, ex.: "art of rally"): só atualiza o tamanho
   const [existing] = await db
     .update(switchGames)
     .set({ sizeMb: size })
-    .where(and(eq(switchGames.ownerId, user.id), eq(switchGames.igdbId, igdbId)))
+    .where(and(eq(switchGames.ownerId, user.id), eq(switchGames.platform, platform), eq(switchGames.igdbId, igdbId)))
     .returning();
   if (existing) {
-    revalidatePath("/switch", "layout");
+    refresh();
     return existing;
   }
   const cover = coverUrl?.startsWith("https://images.igdb.com/") ? coverUrl : null;
   const screenshots = (await getIgdbScreenshots([igdbId]).catch(() => new Map<number, string[]>())).get(igdbId) ?? [];
-  const values = { ownerId: user.id, title: name, sizeMb: size, igdbId, coverUrl: cover, screenshots };
+  const values = { ownerId: user.id, platform, title: name, sizeMb: size, igdbId, coverUrl: cover, screenshots };
   const [row] = await db
     .insert(switchGames)
     .values(values)
-    .onConflictDoUpdate({ target: [switchGames.ownerId, switchGames.title], set: { sizeMb: size, igdbId, coverUrl: cover, screenshots } })
+    .onConflictDoUpdate({ target: [switchGames.ownerId, switchGames.platform, switchGames.title], set: { sizeMb: size, igdbId, coverUrl: cover, screenshots } })
     .returning();
-  revalidatePath("/switch", "layout");
-  revalidatePath(`/jogo/${igdbId}`);
+  refresh();
   return row;
 }
 
 export async function removeSwitchGame(id: string) {
   const user = await requireUser();
   await db.delete(switchGames).where(and(eq(switchGames.id, id), eq(switchGames.ownerId, user.id)));
-  revalidatePath("/switch", "layout");
-  revalidatePath("/jogo/[igdbId]", "page");
+  refresh();
 }

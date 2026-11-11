@@ -8,6 +8,7 @@ import { ArrowLeft, Gamepad2 } from "lucide-react";
 import { LISTS, platformOf, PLATFORMS, type DiscoverGroup, type ListId, type PlatformId } from "@/lib/discover-lists";
 import { ptGenre } from "@/lib/genres";
 import { GUTTER } from "./rail";
+import { useGameMenu } from "./game-menu";
 import { BacklogButton, ShotCover, useBacklogToggle, type BacklogRef } from "./shot-cover";
 
 const dateFmt = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
@@ -27,6 +28,7 @@ export function DiscoverView({
   installed: number[];
 }) {
   const { owned, busy, toggle } = useBacklogToggle(backlog);
+  const openMenu = useGameMenu();
   const installed = useMemo(() => new Set(installedIds), [installedIds]);
   const sp = useSearchParams();
   // Fica na URL (e passa entre listas/plataformas): voltar de um jogo reabre do mesmo jeito
@@ -53,11 +55,8 @@ export function DiscoverView({
   return (
     <div className="mx-auto max-w-[1600px] pb-10 pt-[calc(env(safe-area-inset-top)+20px)] lg:pt-28">
       <header className={GUTTER}>
-        <Link
-          href={platform === "switch" ? "/switch" : "/lista?k=game"}
-          className="group mb-3 inline-flex items-center gap-1 text-[13px] font-medium text-text-2 hover:text-white"
-        >
-          <ArrowLeft size={15} className="transition-transform group-hover:-translate-x-0.5" /> {platform === "switch" ? "Meu Switch" : "Jogos"}
+        <Link href="/lista?k=game" className="group mb-3 inline-flex items-center gap-1 text-[13px] font-medium text-text-2 hover:text-white">
+          <ArrowLeft size={15} className="transition-transform group-hover:-translate-x-0.5" /> Jogos
         </Link>
         <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
           <h1 className="text-[34px] font-bold leading-none tracking-tight lg:text-[52px]">Descobrir</h1>
@@ -140,7 +139,10 @@ export function DiscoverView({
                 );
                 return (
                   <div key={g.igdbId} className="rise" style={{ animationDelay: `${Math.min(idx, 18) * 20}ms` }}>
-                    <div className="group relative">
+                    <div
+                      className="group relative"
+                      onContextMenu={(e) => openMenu(e, { igdbId: g.igdbId, title: g.title, coverUrl: g.coverUrl, itemId: item?.id, done: item?.done })}
+                    >
                       <Link href={item ? `/item/${item.id}` : `/jogo/${g.igdbId}`} aria-label={g.title} className="block">
                         {cover}
                       </Link>

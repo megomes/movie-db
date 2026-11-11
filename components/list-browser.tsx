@@ -5,15 +5,17 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowDownAZ, Baby, Check, ChevronDown, ChevronRight, Clock, Compass, Gamepad2, Plus, Search, Shuffle, Sparkles, Star, X } from "lucide-react";
+import { ArrowDownAZ, Baby, Check, ChevronDown, ChevronRight, Clock, Compass, HardDrive, Plus, Search, Shuffle, Sparkles, Star, X } from "lucide-react";
 import { COLLECTIONS, FAMILY_LIST } from "@/lib/collections";
 import type { Kind } from "@/lib/db/schema";
 import { normalize } from "@/lib/sources/http";
 import { ptGenre } from "@/lib/genres";
-import { accessFor, KIND_META, KINDS } from "@/lib/kinds";
-import type { LiteItem, TagLite } from "@/lib/queries";
+import { accessFor, formatSize, KIND_META, KINDS } from "@/lib/kinds";
+import type { InstalledLite, LiteItem, TagLite } from "@/lib/queries";
 import { useBacklog } from "./backlog-context";
+import { useGameMenu } from "./game-menu";
 import { Poster } from "./poster";
+import { ShotCover } from "./shot-cover";
 import { GUTTER } from "./rail";
 import { TagNudge } from "./tag-nudge";
 
@@ -173,9 +175,44 @@ export function ListBrowser({
     return [...m.values()].sort((a, b) => b.count - a.count);
   }, [ofKind, ctx.myProviders, readOnly, streamKinds]);
 
-  // Agrupamento: Tudo → por divisão; divisão com tags → pela combinação de tags (sem repetir itens)
-  const sections = useMemo(() => {
+  // Jogos instalados (Switch/PC) por igdbId, para o grupo "Instalados" e o selo com o tamanho
+  const gameGroups = kind === "game" && !readOnly && mode !== "home";
+  const installedBy = useMemo(() => {
+    const m = new Map<number, InstalledLite[]>();
+    for (const r of ctx.installed) m.set(r.igdbId, [...(m.get(r.igdbId) ?? []), r]);
+    return m;
+  }, [ctx.installed]);
+  const installedLabel = (i: LiteItem) => {
+    const rows = i.igdbId != null ? installedBy.get(i.igdbId) : undefined;
+    return rows?.map((r) => `${r.platform === "pc" ? "PC" : "Switch"} ${formatSize(r.sizeMb)}`).join(" · ");
+  };
+
+  // Agrupamento: Tudo → por divisão; Jogos → Instalados, Quero muito, Backlog; divisão com tags → pela combinação de tags
+  const sections = useMemo((): Section[] => {
     const filtering = !!q || !!filter.tag || !!filter.genre || onlyPinned || onlyMine || onlySale || provider != null;
+    if (gameGroups) {
+      const isInst = (i: LiteItem) => i.igdbId != null && installedBy.has(i.igdbId);
+      // Instalados que não estão no backlog também entram (só a busca e o filtro de plataforma valem para eles)
+      const mine = new Set(items.filter((i) => i.kind === "game").map((i) => i.igdbId));
+      const plat = filter.tag?.startsWith("plat:") ? (filter.tag.slice(5) === "PC" ? "pc" : "switch") : null;
+      const otherFilters = !!filter.genre || (!!filter.tag && !plat) || onlyPinned || onlyMine || onlySale || provider != null;
+      const nq = normalize(q);
+      const seen = new Set<number>();
+      const extra = otherFilters
+        ? []
+        : ctx.installed.filter((r) => {
+            if (mine.has(r.igdbId) || seen.has(r.igdbId)) return false;
+            if (plat && !(installedBy.get(r.igdbId) ?? []).some((x) => x.platform === plat)) return false;
+            if (nq && !normalize(r.title).includes(nq)) return false;
+            seen.add(r.igdbId);
+            return true;
+          });
+      return [
+        { key: "installed", title: "Instalados", hint: "No Switch ou no PC", href: undefined, items: visible.filter(isInst), extra },
+        { key: "liked", title: "♥ Quero muito", hint: "Priorizados que ainda não estão instalados", href: undefined, items: visible.filter((i) => !isInst(i) && i.pinned) },
+        { key: "backlog", title: "Backlog", hint: undefined, href: undefined, items: visible.filter((i) => !isInst(i) && !i.pinned) },
+      ].filter((s) => s.items.length || s.extra?.length);
+    }
     if (filtering) return [{ key: "all", title: "", href: undefined as string | undefined, items: visible }];
     if (kind === "all")
       return KINDS.map((k) => ({ key: k, title: KIND_META[k].plural, href: `${base}?k=${k}` as string | undefined, items: visible.filter((i) => i.kind === k) })).filter(
@@ -191,7 +228,7 @@ export function ListBrowser({
     return [...m.entries()]
       .sort((a, b) => (a[0] === "Sem tag" ? 1 : b[0] === "Sem tag" ? -1 : b[1].length - a[1].length))
       .map(([k, items]) => ({ key: k, title: k, href: undefined, items }));
-  }, [visible, kind, q, filter, onlyPinned, onlyMine, onlySale, provider, tagList, tagMeta, base]);
+  }, [visible, kind, q, filter, onlyPinned, onlyMine, onlySale, provider, tagList, tagMeta, base, gameGroups, installedBy, items, ctx.installed]);
 
   // Livros da família: lista compartilhada, sempre no fim da divisão Livros
   const family = useMemo(() => {
@@ -222,14 +259,9 @@ export function ListBrowser({
           )}
           <div className="flex items-center gap-2">
             {!readOnly && !home && kind === "game" && (
-              <>
-                <Link href="/descobrir" className="glass tap flex h-11 items-center gap-2 rounded-full pl-3 pr-4 text-[14px] font-medium text-white/85 hover:text-white" aria-label="Descobrir">
-                  <Compass size={17} /> <span className="hidden sm:inline">Descobrir</span>
-                </Link>
-                <Link href="/switch" className="glass tap flex h-11 items-center gap-2 rounded-full pl-3 pr-4 text-[14px] font-medium text-white/85 hover:text-white" aria-label="Meu Switch">
-                  <Gamepad2 size={17} /> <span className="hidden sm:inline">Meu Switch</span>
-                </Link>
-              </>
+              <Link href="/descobrir" className="glass tap flex h-11 items-center gap-2 rounded-full pl-3 pr-4 text-[14px] font-medium text-white/85 hover:text-white" aria-label="Descobrir">
+                <Compass size={17} /> <span className="hidden sm:inline">Descobrir</span>
+              </Link>
             )}
             {sort === "shuffle" && (
               <button onClick={() => setSeed((s) => s + 1)} className="glass tap flex h-11 w-11 items-center justify-center rounded-full" aria-label="Embaralhar de novo">
@@ -341,9 +373,12 @@ export function ListBrowser({
           <section key={s.key}>
             {s.title && (
               <div className={`mb-3 flex items-baseline justify-between ${GUTTER}`}>
-                <h3 className="text-[20px] font-bold tracking-tight lg:text-[22px]">
-                  {s.title} <span className="text-[14px] font-semibold text-text-3">{s.items.length}</span>
-                </h3>
+                <div className="min-w-0">
+                  <h3 className="text-[20px] font-bold tracking-tight lg:text-[22px]">
+                    {s.title} <span className="text-[14px] font-semibold text-text-3">{s.items.length + (s.extra?.length ?? 0)}</span>
+                  </h3>
+                  {s.hint && <p className="mt-0.5 text-[13px] text-text-3">{s.hint}</p>}
+                </div>
                 {s.href && kind === "all" && (
                   <Link
                     href={s.href}
@@ -362,14 +397,19 @@ export function ListBrowser({
             <div className={`grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 lg:gap-5 2xl:grid-cols-8 ${GUTTER}`}>
               {s.items.map((i, idx) => (
                 <div key={i.id} className="rise" style={{ animationDelay: `${Math.min(idx, 18) * 20}ms` }}>
-                  <Poster item={i} morph={!noMorphIds?.has(i.id)} eager={idx < 12} />
+                  <Poster item={i} morph={!noMorphIds?.has(i.id)} eager={idx < 12} installed={gameGroups ? installedLabel(i) : undefined} />
+                </div>
+              ))}
+              {s.extra?.map((r, idx) => (
+                <div key={r.id} className="rise" style={{ animationDelay: `${Math.min(s.items.length + idx, 18) * 20}ms` }}>
+                  <InstalledCard row={r} label={(installedBy.get(r.igdbId) ?? [r]).map((x) => `${x.platform === "pc" ? "PC" : "Switch"} ${formatSize(x.sizeMb)}`).join(" · ")} />
                 </div>
               ))}
             </div>
           </section>
         ))}
       </div>
-      {!visible.length && <p className="px-4 py-24 text-center text-text-2">Nada por aqui com esses filtros.</p>}
+      {!sections.length && <p className="px-4 py-24 text-center text-text-2">Nada por aqui com esses filtros.</p>}
 
       {family && (!q || family.length > 0) && (
         <section className="mt-16">
@@ -398,6 +438,39 @@ export function ListBrowser({
         </section>
       )}
     </div>
+  );
+}
+
+type Section = { key: string; title: string; hint?: string; href: string | undefined; items: LiteItem[]; extra?: InstalledLite[] };
+
+// Jogo instalado que não está no backlog: capa com screenshots, um pouco apagada; o botão direito põe no backlog
+function InstalledCard({ row, label }: { row: InstalledLite; label: string }) {
+  const openMenu = useGameMenu();
+  return (
+    <Link
+      href={`/jogo/${row.igdbId}`}
+      aria-label={row.title}
+      className="group relative block"
+      onContextMenu={(e) => openMenu(e, { igdbId: row.igdbId, title: row.title, coverUrl: row.coverUrl })}
+    >
+      <ShotCover
+        id={row.id}
+        title={row.title}
+        coverUrl={row.coverUrl}
+        screenshots={row.screenshots}
+        dim
+        overlay={(scrubbing) =>
+          !scrubbing && (
+            <>
+              <span className="absolute left-2 top-2 rounded-full bg-black/65 px-2 py-0.5 text-[11px] font-semibold ring-1 ring-white/10">Fora do backlog</span>
+              <span className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-success/90 px-2 py-0.5 text-[10.5px] font-semibold text-black">
+                <HardDrive size={10} /> {label}
+              </span>
+            </>
+          )
+        }
+      />
+    </Link>
   );
 }
 

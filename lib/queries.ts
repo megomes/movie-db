@@ -2,7 +2,10 @@ import "server-only";
 import { and, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { asc } from "drizzle-orm";
 import { db, items, profiles, switchGames, tags, type Item } from "@/lib/db";
+import { artSrc } from "@/lib/img";
 import { hoursOf } from "@/lib/kinds";
+
+export type InstallPlatform = "switch" | "pc";
 
 export type Person = { userId: string; name: string | null; image: string | null; email: string };
 
@@ -124,6 +127,9 @@ export function toLite(i: Item) {
     availability: i.availability,
     platforms: i.platforms,
     myPlatforms: i.myPlatforms,
+    igdbId: i.igdbId,
+    // Screenshots (jogos) para passear com o mouse na capa
+    shots: i.kind === "game" ? i.gallery.slice(0, 8).map((u) => artSrc(u, "md")!) : [],
     gamePass: i.gamePass,
     steamPrice: i.steamPrice,
     minutes: i.minutes,
@@ -176,13 +182,36 @@ export async function getSwitchGame(ownerId: string, igdbId: number) {
   const [row] = await db
     .select({ id: switchGames.id, sizeMb: switchGames.sizeMb })
     .from(switchGames)
-    .where(and(eq(switchGames.ownerId, ownerId), eq(switchGames.igdbId, igdbId)));
+    .where(and(eq(switchGames.ownerId, ownerId), eq(switchGames.platform, "switch"), eq(switchGames.igdbId, igdbId)));
   return row ?? null;
 }
 
 export async function listSwitchGames(ownerId: string) {
-  return db.select().from(switchGames).where(eq(switchGames.ownerId, ownerId)).orderBy(desc(switchGames.sizeMb));
+  return db
+    .select()
+    .from(switchGames)
+    .where(and(eq(switchGames.ownerId, ownerId), eq(switchGames.platform, "switch")))
+    .orderBy(desc(switchGames.sizeMb));
 }
+
+// Tudo que está instalado (Switch e PC): grupo "Instalados" em Jogos e estado do menu de botão direito
+export async function listInstalled(ownerId: string) {
+  const rows = await db
+    .select({
+      id: switchGames.id,
+      igdbId: switchGames.igdbId,
+      platform: switchGames.platform,
+      sizeMb: switchGames.sizeMb,
+      title: switchGames.title,
+      coverUrl: switchGames.coverUrl,
+      screenshots: switchGames.screenshots,
+    })
+    .from(switchGames)
+    .where(and(eq(switchGames.ownerId, ownerId), isNotNull(switchGames.igdbId)))
+    .orderBy(desc(switchGames.sizeMb));
+  return rows.map((r) => ({ ...r, igdbId: r.igdbId!, platform: r.platform as InstallPlatform }));
+}
+export type InstalledLite = Awaited<ReturnType<typeof listInstalled>>[number];
 
 // Jogos do backlog (ainda não zerados) que saem para Switch, pelo IGDB, e não estão instalados
 export async function switchBacklogNotInstalled(ownerId: string, installedIgdb: number[]) {

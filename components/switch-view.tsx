@@ -12,6 +12,7 @@ import { useSearch } from "./add-search";
 import { Cover } from "./cover";
 import { InstallChip, Sheet, SizeField, toMb } from "./install-dialog";
 import { GUTTER } from "./rail";
+import { useGameMenu } from "./game-menu";
 import { BacklogButton, ShotCover, useBacklogToggle, type BacklogRef } from "./shot-cover";
 
 export type SwitchEntry = {
@@ -196,6 +197,7 @@ function SwitchCard({
   delay: number;
 }) {
   const on = !!item;
+  const openMenu = useGameMenu();
   const cover = (
     <ShotCover
       id={g.id}
@@ -219,7 +221,11 @@ function SwitchCard({
 
   return (
     <div className="rise" style={{ animationDelay: `${delay}ms` }}>
-      <div className={`group relative ${editing ? "wiggle" : ""}`} style={editing ? { animationDelay: `${(delay % 7) * -40}ms` } : undefined}>
+      <div
+        className={`group relative ${editing ? "wiggle" : ""}`}
+        style={editing ? { animationDelay: `${(delay % 7) * -40}ms` } : undefined}
+        onContextMenu={editing ? undefined : (e) => openMenu(e, { igdbId: g.igdbId, title: g.title, coverUrl: g.coverUrl, itemId: item?.id, done: item?.done })}
+      >
         {editing ? (
           <div className="pointer-events-none">{cover}</div>
         ) : item || g.igdbId != null ? (
@@ -255,9 +261,10 @@ function SwitchCard({
 
 // Jogo do backlog que não está no Switch: abre o item e tem o atalho para instalar (com o tamanho)
 function MissingCard({ game: g, eager, delay, onInstalled }: { game: MissingEntry; eager: boolean; delay: number; onInstalled: () => void }) {
+  const openMenu = useGameMenu();
   return (
     <div className="rise" style={{ animationDelay: `${delay}ms` }}>
-      <div className="group relative">
+      <div className="group relative" onContextMenu={(e) => openMenu(e, { igdbId: g.igdbId, title: g.title, coverUrl: g.coverUrl, itemId: g.id })}>
         <Link href={`/item/${g.id}`} aria-label={g.title} className="block">
           <ShotCover id={g.id} title={g.title} coverUrl={g.coverUrl} screenshots={g.screenshots} eager={eager} />
         </Link>

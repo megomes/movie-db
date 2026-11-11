@@ -1,8 +1,9 @@
 import { AppShell } from "@/components/app-shell";
+import { GameMenuProvider } from "@/components/game-menu";
 import { BacklogProvider } from "@/components/backlog-context";
 import { SiteFooter } from "@/components/site-footer";
 import { FAMILY_LIST } from "@/lib/collections";
-import { countDone, doneHours, listCollection, listItems, listPeople, listShared, listTags, toLite } from "@/lib/queries";
+import { countDone, doneHours, listCollection, listInstalled, listItems, listPeople, listShared, listTags, toLite } from "@/lib/queries";
 import { getProfile, requireUser } from "@/lib/session";
 
 // Tudo aqui depende da sessão do usuário
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const user = await requireUser();
-  const [rows, profile, people, tags, shared, doneCount, watchedHours, family] = await Promise.all([
+  const [rows, profile, people, tags, shared, doneCount, watchedHours, family, installed] = await Promise.all([
     listItems(user.id),
     getProfile(user.id),
     listPeople(),
@@ -19,6 +20,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
     countDone(user.id),
     doneHours(user.id),
     listCollection(FAMILY_LIST),
+    listInstalled(user.id),
   ]);
   const items = rows.map(toLite);
   const reviewCount = rows.filter((r) => r.matchStatus !== "matched").length;
@@ -34,8 +36,11 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       shared={shared}
       doneCount={doneCount}
       family={family}
+      installed={installed}
     >
-      <AppShell footer={<SiteFooter doneHours={watchedHours} />}>{children}</AppShell>
+      <GameMenuProvider>
+        <AppShell footer={<SiteFooter doneHours={watchedHours} />}>{children}</AppShell>
+      </GameMenuProvider>
     </BacklogProvider>
   );
 }
