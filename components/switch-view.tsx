@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowLeft, Check, Compass, HardDrive, Loader2, Pencil, Plus, Search, Trophy, X } from "lucide-react";
@@ -10,7 +10,7 @@ import { formatSize } from "@/lib/kinds";
 import type { SearchResult } from "@/lib/search";
 import { useSearch } from "./add-search";
 import { Cover } from "./cover";
-import { Sheet, SizeField, toMb } from "./install-dialog";
+import { InstallChip, Sheet, SizeField, toMb } from "./install-dialog";
 import { GUTTER } from "./rail";
 import { BacklogButton, ShotCover, useBacklogToggle, type BacklogRef } from "./shot-cover";
 
@@ -23,10 +23,14 @@ export type SwitchEntry = {
   screenshots: string[];
 };
 
+// Jogo do backlog com a tag Switch que não está no console
+export type MissingEntry = { id: string; title: string; igdbId: number | null; coverUrl: string | null; screenshots: string[] };
+
 const FILTERS = [
   { id: "all", label: "Todos" },
   { id: "in", label: "No backlog" },
   { id: "out", label: "Fora do backlog" },
+  { id: "missing", label: "No backlog, não instalado" },
 ] as const;
 type FilterId = (typeof FILTERS)[number]["id"];
 
@@ -35,8 +39,10 @@ export function SwitchView({
   games: initial,
   backlog,
   switchTagId,
+  missing,
 }: {
   games: SwitchEntry[];
+  missing: MissingEntry[];
   backlog: Record<number, BacklogRef>;
   switchTagId: string | null;
 }) {
@@ -50,7 +56,13 @@ export function SwitchView({
   }
   const [editing, setEditing] = useState(false);
   const [adding, setAdding] = useState(false);
-  const [filter, setFilter] = useState<FilterId>("all");
+  // O filtro fica na URL: voltar de um jogo reabre no mesmo filtro
+  const sp = useSearchParams();
+  const [filter, setFilterState] = useState<FilterId>(FILTERS.find((f) => f.id === sp.get("filtro"))?.id ?? "all");
+  function setFilter(f: FilterId) {
+    setFilterState(f);
+    window.history.replaceState(null, "", f === "all" ? "/switch" : `/switch?filtro=${f}`);
+  }
   const { owned, busy, toggle } = useBacklogToggle(backlog, switchTagId);
 
   const itemOf = (g: SwitchEntry) => (g.igdbId != null ? (owned[g.igdbId] ?? null) : null);
@@ -84,7 +96,7 @@ export function SwitchView({
             Meu Switch <span className="text-[0.55em] font-semibold text-text-3">{games.length}</span>
           </h1>
           <div className="flex items-center gap-2">
-            <Link href="/switch/descobrir" className="glass tap flex h-11 items-center gap-2 rounded-full px-4 text-[14px] font-medium text-white/85 hover:text-white">
+            <Link href="/descobrir?plataforma=switch" className="glass tap flex h-11 items-center gap-2 rounded-full px-4 text-[14px] font-medium text-white/85 hover:text-white">
               <Compass size={16} /> <span className="hidden sm:inline">Descobrir</span>
             </Link>
             <button
@@ -114,14 +126,23 @@ export function SwitchView({
             <button key={f.id} onClick={() => setFilter(f.id)} className="relative shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium">
               {filter === f.id && <motion.span layoutId="switch-filter" className="btn-accent absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
               <span className={`relative ${filter === f.id ? "text-white" : "text-white/70"}`}>
-                {f.label} <span className="opacity-55">{f.id === "all" ? games.length : f.id === "in" ? inBacklog : games.length - inBacklog}</span>
+                {f.label} <span className="opacity-55">{f.id === "all" ? games.length : f.id === "in" ? inBacklog : f.id === "out" ? games.length - inBacklog : missing.length}</span>
               </span>
             </button>
           ))}
         </div>
       </div>
 
-      <div className={`grid grid-cols-3 gap-x-3 gap-y-5 pt-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 lg:gap-x-5 lg:gap-y-7 2xl:grid-cols-8 ${GUTTER}`}>
+      {filter === "missing" && (
+        <div className={`grid grid-cols-3 gap-x-3 gap-y-5 pt-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 lg:gap-x-5 lg:gap-y-7 2xl:grid-cols-8 ${GUTTER}`}>
+          {missing.map((g, idx) => (
+            <MissingCard key={g.id} game={g} eager={idx < 12} delay={Math.min(idx, 18) * 20} onInstalled={() => router.refresh()} />
+          ))}
+        </div>
+      )}
+      {filter === "missing" && !missing.length && <p className="px-4 py-24 text-center text-text-2">Tudo que está no backlog já está instalado.</p>}
+
+      <div className={`grid grid-cols-3 gap-x-3 gap-y-5 pt-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 lg:gap-x-5 lg:gap-y-7 2xl:grid-cols-8 ${GUTTER} ${filter === "missing" ? "hidden" : ""}`}>
         {visible.map((g, idx) => (
           <SwitchCard
             key={g.id}
@@ -137,7 +158,7 @@ export function SwitchView({
           />
         ))}
       </div>
-      {!visible.length && <p className="px-4 py-24 text-center text-text-2">Nada por aqui.</p>}
+      {filter !== "missing" && !visible.length && <p className="px-4 py-24 text-center text-text-2">Nada por aqui.</p>}
 
       <AnimatePresence>
         {adding && (
@@ -230,6 +251,27 @@ function SwitchCard({
       <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/8">
         <div className={`h-full rounded-full ${on ? "bg-accent" : "bg-white/35"}`} style={{ width: `${Math.max(2, (g.sizeMb / max) * 100)}%` }} />
       </div>
+    </div>
+  );
+}
+
+// Jogo do backlog que não está no Switch: abre o item e tem o atalho para instalar (com o tamanho)
+function MissingCard({ game: g, eager, delay, onInstalled }: { game: MissingEntry; eager: boolean; delay: number; onInstalled: () => void }) {
+  return (
+    <div className="rise" style={{ animationDelay: `${delay}ms` }}>
+      <div className="group relative">
+        <Link href={`/item/${g.id}`} aria-label={g.title} className="block">
+          <ShotCover id={g.id} title={g.title} coverUrl={g.coverUrl} screenshots={g.screenshots} eager={eager} />
+        </Link>
+      </div>
+      <p className="mt-2 truncate text-[13px] font-medium leading-tight" title={g.title}>
+        {g.title}
+      </p>
+      {g.igdbId != null && (
+        <div className="mt-1.5">
+          <InstallChip game={{ igdbId: g.igdbId, title: g.title, coverUrl: g.coverUrl }} installed={null} onChange={(next) => next && onInstalled()} />
+        </div>
+      )}
     </div>
   );
 }

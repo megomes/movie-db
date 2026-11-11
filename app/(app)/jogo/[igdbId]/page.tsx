@@ -8,7 +8,8 @@ import { Gallery, TrailerButton } from "@/components/media-gallery";
 import { displayGenres } from "@/lib/genres";
 import { artSrc } from "@/lib/img";
 import { formatMinutes, formatSize } from "@/lib/kinds";
-import { backlogByIgdb, listSwitchGames, switchTagId } from "@/lib/queries";
+import { isPlatformId, platformOf } from "@/lib/discover-lists";
+import { backlogByIgdb, gameTagId, listSwitchGames } from "@/lib/queries";
 import { getIgdbDetails } from "@/lib/sources/igdb";
 import { requireUser } from "@/lib/session";
 
@@ -25,7 +26,7 @@ export async function generateMetadata({ params }: PageProps<"/jogo/[igdbId]">) 
 
 const compact = (n: number) => Intl.NumberFormat("pt-BR", { notation: "compact" }).format(n);
 
-export default async function GamePage({ params }: PageProps<"/jogo/[igdbId]">) {
+export default async function GamePage({ params, searchParams }: PageProps<"/jogo/[igdbId]">) {
   const user = await requireUser();
   const id = parseId((await params).igdbId);
   if (!id) notFound();
@@ -34,7 +35,10 @@ export default async function GamePage({ params }: PageProps<"/jogo/[igdbId]">) 
   const backlog = await backlogByIgdb(user.id, [id]);
   if (backlog[id]) redirect(`/item/${backlog[id].id}`);
 
-  const [game, installed, tagId] = await Promise.all([getGame(id), listSwitchGames(user.id), switchTagId(user.id)]);
+  // Entra no backlog com a tag da plataforma de onde veio (Descobrir de PC → "PC"); sem isso, Switch
+  const { plataforma } = await searchParams;
+  const tagName = platformOf(isPlatformId(plataforma) ? plataforma : "switch").tag;
+  const [game, installed, tagId] = await Promise.all([getGame(id), listSwitchGames(user.id), gameTagId(user.id, tagName)]);
   if (!game?.title) notFound();
   const onSwitch = installed.find((g) => g.igdbId === id);
   const art = artSrc(game.backdropUrl, "lg");
@@ -60,7 +64,7 @@ export default async function GamePage({ params }: PageProps<"/jogo/[igdbId]">) 
         </div>
 
         <div className="relative mx-auto max-w-[1400px] px-4 pb-6 pt-[calc(env(safe-area-inset-top)+12px)] sm:px-6 lg:px-10 lg:pb-10 lg:pt-28">
-          <BackButton fallback="/switch/descobrir" />
+          <BackButton fallback="/descobrir" />
 
           <div className={`flex flex-col gap-6 lg:flex-row lg:items-end lg:gap-12 ${art ? "mt-[26vh] lg:mt-[34vh]" : "mt-6 lg:mt-8"}`}>
             <div className="w-[46%] max-w-[220px] shrink-0 lg:w-[260px] lg:max-w-none">

@@ -171,11 +171,13 @@ export async function backlogByIgdb(ownerId: string, igdbIds: number[]) {
   return Object.fromEntries(rows.map((r) => [r.igdbId!, { id: r.id, done: !!r.doneAt }])) as Record<number, { id: string; done: boolean }>;
 }
 
-// Tag "Switch" da pessoa (jogos adicionados pelas páginas do Switch entram com ela)
-export async function switchTagId(ownerId: string) {
-  const [t] = await db.select({ id: tags.id }).from(tags).where(and(eq(tags.ownerId, ownerId), eq(tags.kind, "game"), eq(tags.name, "Switch")));
+// Tag de jogo da pessoa pelo nome ("Switch", "PC"…): jogos adicionados pelo Descobrir/Meu Switch entram com ela
+export async function gameTagId(ownerId: string, name: string) {
+  const [t] = await db.select({ id: tags.id }).from(tags).where(and(eq(tags.ownerId, ownerId), eq(tags.kind, "game"), eq(tags.name, name)));
   return t?.id ?? null;
 }
+
+export const switchTagId = (ownerId: string) => gameTagId(ownerId, "Switch");
 
 export async function getSwitchGame(ownerId: string, igdbId: number) {
   const [row] = await db
@@ -187,4 +189,21 @@ export async function getSwitchGame(ownerId: string, igdbId: number) {
 
 export async function listSwitchGames(ownerId: string) {
   return db.select().from(switchGames).where(eq(switchGames.ownerId, ownerId)).orderBy(desc(switchGames.sizeMb));
+}
+
+// Jogos de Switch no backlog (tag Switch, ainda não zerados) que não estão instalados
+export async function switchBacklogNotInstalled(ownerId: string, tagId: string, installedIgdb: number[]) {
+  return db
+    .select({ id: items.id, title: items.title, igdbId: items.igdbId, coverUrl: items.coverUrl, gallery: items.gallery, minutes: items.minutes })
+    .from(items)
+    .where(
+      and(
+        eq(items.ownerId, ownerId),
+        eq(items.kind, "game"),
+        isNull(items.doneAt),
+        sql`${tagId}::uuid = any(${items.tagIds})`,
+        installedIgdb.length ? sql`(${items.igdbId} is null or ${items.igdbId} <> all(${sql.raw(`array[${installedIgdb.map(Number).join(",")}]::int[]`)}))` : undefined,
+      ),
+    )
+    .orderBy(desc(items.pinned), desc(items.score));
 }

@@ -1,10 +1,10 @@
 /* eslint-disable @next/next/no-img-element -- logos, fotos e fundos vêm de CDNs externos */
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CalendarDays, ChevronLeft, Clock, ExternalLink, FileText, Gamepad2, Star, Tag, Trophy } from "lucide-react";
+import { CalendarDays, Clock, ExternalLink, FileText, Gamepad2, Star, Tag, Trophy } from "lucide-react";
 import { Cover } from "@/components/cover";
 import { AmbientColor, CopyButton, DoneBadge, DoneButton, ItemMenu, ItemTags, NotesEditor, PinButton } from "@/components/item-actions";
-import { GameInstallButton } from "@/components/game-actions";
+import { BackButton, GameInstallButton } from "@/components/game-actions";
 import { Gallery, TrailerButton } from "@/components/media-gallery";
 import { COLLECTIONS, isShared } from "@/lib/collections";
 import { displayGenres } from "@/lib/genres";
@@ -99,9 +99,7 @@ export default async function ItemPage({ params }: PageProps<"/item/[id]">) {
         </div>
 
         <div className="relative mx-auto max-w-[1400px] px-4 pb-6 pt-[calc(env(safe-area-inset-top)+12px)] sm:px-6 lg:px-10 lg:pb-10 lg:pt-28">
-          <Link href={collection ? "/lista?k=book" : "/lista"} className="glass tap inline-flex h-10 items-center gap-1 rounded-full pl-2.5 pr-4 text-[14px]">
-            <ChevronLeft size={20} /> Voltar
-          </Link>
+          <BackButton fallback={collection ? "/lista?k=book" : `/lista?k=${item.kind}`} />
 
           {/* Com arte de fundo, a capa desce pra deixar a arte aparecer; sem arte, não sobra vão vazio */}
           <div className={`flex flex-col gap-6 lg:flex-row lg:items-end lg:gap-12 ${art ? "mt-[26vh] lg:mt-[34vh]" : "mt-6 lg:mt-8"}`}>

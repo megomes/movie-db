@@ -1,4 +1,15 @@
-// Listas para descobrir jogos de Switch, direto do IGDB (nada é guardado no banco)
+// Listas para descobrir jogos, direto do IGDB (nada é guardado no banco)
+
+// Plataformas (IDs do IGDB). Switch é só o original: exclusivos do Switch 2 ficam de fora.
+// "tag" é a tag do backlog que o jogo ganha quando entra por aqui.
+export const PLATFORMS = [
+  { id: "pc", label: "PC", igdb: 6, tag: "PC" },
+  { id: "switch", label: "Switch", igdb: 130, tag: "Switch" },
+  { id: "android", label: "Android", igdb: 34, tag: "Android" },
+] as const;
+export type PlatformId = (typeof PLATFORMS)[number]["id"];
+export const isPlatformId = (v: unknown): v is PlatformId => PLATFORMS.some((p) => p.id === v);
+export const platformOf = (id: PlatformId) => PLATFORMS.find((p) => p.id === id)!;
 export const LISTS = [
   { id: "top", label: "Melhores", short: "Melhores", hint: "Nota mais alta, agrupados por quando foram lançados" },
   { id: "hot", label: "Em alta agora", short: "Em alta", hint: "Os mais visitados no IGDB nos últimos dias" },

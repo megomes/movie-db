@@ -3,9 +3,9 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowDownAZ, Baby, Check, ChevronDown, ChevronRight, Clock, Gamepad2, Plus, Search, Shuffle, Sparkles, Star, X } from "lucide-react";
+import { ArrowDownAZ, Baby, Check, ChevronDown, ChevronRight, Clock, Compass, Gamepad2, Plus, Search, Shuffle, Sparkles, Star, X } from "lucide-react";
 import { COLLECTIONS, FAMILY_LIST } from "@/lib/collections";
 import type { Kind } from "@/lib/db/schema";
 import { normalize } from "@/lib/sources/http";
@@ -74,12 +74,13 @@ export function ListBrowser({
   const kindParam = mode === "home" ? null : sp.get("k");
   const kind: Kind | "all" = KINDS.includes(kindParam as Kind) ? (kindParam as Kind) : "all";
   const [sort, setSort] = useState<SortId>(SORTS.some((s) => s.id === sp.get("sort")) ? (sp.get("sort") as SortId) : "score");
-  const [filter, setFilter] = useState<{ tag: string | null; genre: string | null }>({ tag: null, genre: null });
-  const [onlyPinned, setOnlyPinned] = useState(false);
-  const [onlyMine, setOnlyMine] = useState(sp.get("f") === "mine");
-  const [provider, setProvider] = useState<number | null>(null);
-  const [onlySale, setOnlySale] = useState(sp.get("f") === "sale");
-  const [q, setQ] = useState("");
+  // Filtros ficam na URL: voltar de um item reabre a lista do jeito que estava
+  const [filter, setFilter] = useState<{ tag: string | null; genre: string | null }>({ tag: sp.get("tag"), genre: sp.get("genero") });
+  const [onlyPinned, setOnlyPinned] = useState(sp.get("fav") === "1");
+  const [onlyMine, setOnlyMine] = useState(sp.get("f") === "mine" || sp.get("meu") === "1");
+  const [provider, setProvider] = useState<number | null>(Number(sp.get("streaming")) || null);
+  const [onlySale, setOnlySale] = useState(sp.get("f") === "sale" || sp.get("promo") === "1");
+  const [q, setQ] = useState(sp.get("q") ?? "");
   const [seed, setSeed] = useState(1);
 
   // Troca de divisão zera os filtros
@@ -89,6 +90,23 @@ export function ListBrowser({
     setFilter({ tag: null, genre: null });
     setProvider(null);
   }
+
+  useEffect(() => {
+    if (mode === "home") return;
+    const p = new URLSearchParams(window.location.search);
+    const put = (k: string, v: string | null | false) => (v ? p.set(k, v) : p.delete(k));
+    p.delete("f");
+    put("sort", sort !== "score" && sort);
+    put("tag", filter.tag);
+    put("genero", filter.genre);
+    put("fav", onlyPinned && "1");
+    put("meu", onlyMine && "1");
+    put("promo", onlySale && "1");
+    put("streaming", provider != null && String(provider));
+    put("q", q.trim() && q);
+    const next = p.toString();
+    if (next !== window.location.search.slice(1)) window.history.replaceState(null, "", `${window.location.pathname}${next ? `?${next}` : ""}`);
+  }, [mode, sort, filter, onlyPinned, onlyMine, onlySale, provider, q]);
 
   const tagMeta = useMemo(() => new Map(tagList.map((t) => [t.id, t])), [tagList]);
   const ofKind = useMemo(() => (kind === "all" ? items : items.filter((i) => i.kind === kind)), [items, kind]);
@@ -190,9 +208,14 @@ export function ListBrowser({
           )}
           <div className="flex items-center gap-2">
             {!readOnly && !home && kind === "game" && (
-              <Link href="/switch" className="glass tap flex h-11 items-center gap-2 rounded-full pl-3 pr-4 text-[14px] font-medium text-white/85 hover:text-white">
-                <Gamepad2 size={17} /> <span className="hidden sm:inline">Meu Switch</span>
-              </Link>
+              <>
+                <Link href="/descobrir" className="glass tap flex h-11 items-center gap-2 rounded-full pl-3 pr-4 text-[14px] font-medium text-white/85 hover:text-white" aria-label="Descobrir">
+                  <Compass size={17} /> <span className="hidden sm:inline">Descobrir</span>
+                </Link>
+                <Link href="/switch" className="glass tap flex h-11 items-center gap-2 rounded-full pl-3 pr-4 text-[14px] font-medium text-white/85 hover:text-white" aria-label="Meu Switch">
+                  <Gamepad2 size={17} /> <span className="hidden sm:inline">Meu Switch</span>
+                </Link>
+              </>
             )}
             {sort === "shuffle" && (
               <button onClick={() => setSeed((s) => s + 1)} className="glass tap flex h-11 w-11 items-center justify-center rounded-full" aria-label="Embaralhar de novo">

@@ -1,33 +1,47 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { ArrowLeft, Gamepad2 } from "lucide-react";
-import { LISTS, type DiscoverGroup, type ListId } from "@/lib/discover-lists";
+import { LISTS, platformOf, PLATFORMS, type DiscoverGroup, type ListId, type PlatformId } from "@/lib/discover-lists";
 import { ptGenre } from "@/lib/genres";
 import { GUTTER } from "./rail";
 import { BacklogButton, ShotCover, useBacklogToggle, type BacklogRef } from "./shot-cover";
 
 const dateFmt = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 
-// Listas de jogos de Switch para descobrir o que jogar: passa o mouse para ver screenshots
+// Listas de jogos (PC, Switch, Android) para descobrir o que jogar: passa o mouse para ver screenshots
 export function DiscoverView({
+  platform,
   list,
   groups,
   backlog,
   installed: installedIds,
-  switchTagId,
+  tagId,
 }: {
+  platform: PlatformId;
   list: ListId;
   groups: DiscoverGroup[];
   backlog: Record<number, BacklogRef>;
   installed: number[];
-  switchTagId: string | null;
+  tagId: string | null;
 }) {
-  const { owned, busy, toggle } = useBacklogToggle(backlog, switchTagId);
+  const { owned, busy, toggle } = useBacklogToggle(backlog, tagId);
   const installed = useMemo(() => new Set(installedIds), [installedIds]);
-  const [hideMine, setHideMine] = useState(false);
+  const sp = useSearchParams();
+  // Fica na URL (e passa entre listas/plataformas): voltar de um jogo reabre do mesmo jeito
+  const [hideMine, setHideMine] = useState(sp.get("esconder") === "1");
+  const href = (p: PlatformId, l: ListId) => `/descobrir?plataforma=${p}&lista=${l}${hideMine ? "&esconder=1" : ""}`;
+  function toggleHide() {
+    const next = !hideMine;
+    setHideMine(next);
+    const url = new URL(window.location.href);
+    if (next) url.searchParams.set("esconder", "1");
+    else url.searchParams.delete("esconder");
+    window.history.replaceState(null, "", url.pathname + url.search);
+  }
   const meta = LISTS.find((l) => l.id === list)!;
   const total = groups.reduce((n, g) => n + g.games.length, 0);
   const sections = useMemo(
@@ -41,12 +55,30 @@ export function DiscoverView({
   return (
     <div className="mx-auto max-w-[1600px] pb-10 pt-[calc(env(safe-area-inset-top)+20px)] lg:pt-28">
       <header className={GUTTER}>
-        <Link href="/switch" className="group mb-3 inline-flex items-center gap-1 text-[13px] font-medium text-text-2 hover:text-white">
-          <ArrowLeft size={15} className="transition-transform group-hover:-translate-x-0.5" /> Meu Switch
+        <Link
+          href={platform === "switch" ? "/switch" : "/lista?k=game"}
+          className="group mb-3 inline-flex items-center gap-1 text-[13px] font-medium text-text-2 hover:text-white"
+        >
+          <ArrowLeft size={15} className="transition-transform group-hover:-translate-x-0.5" /> {platform === "switch" ? "Meu Switch" : "Jogos"}
         </Link>
-        <h1 className="text-[34px] font-bold leading-none tracking-tight lg:text-[52px]">Descobrir</h1>
+        <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+          <h1 className="text-[34px] font-bold leading-none tracking-tight lg:text-[52px]">Descobrir</h1>
+          <nav aria-label="Plataforma" className="glass inline-flex gap-1 rounded-full p-1">
+            {PLATFORMS.map((p) => (
+              <Link
+                key={p.id}
+                href={href(p.id, list)}
+                scroll={false}
+                aria-current={platform === p.id ? "page" : undefined}
+                className={`tap rounded-full px-4 py-2 text-[14px] font-semibold transition-colors ${platform === p.id ? "bg-white text-black" : "text-white/70 hover:text-white"}`}
+              >
+                {p.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
         <p className="mt-2 text-[15px] text-text-2">
-          {meta.label} no Switch · <span className="text-text-3">{meta.hint}</span>
+          {meta.label} no {platformOf(platform).label} · <span className="text-text-3">{meta.hint}</span>
         </p>
       </header>
 
@@ -54,14 +86,14 @@ export function DiscoverView({
         <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
           <nav className="glass no-scrollbar inline-flex max-w-full gap-1 overflow-x-auto rounded-full p-1">
             {LISTS.map((l) => (
-              <Link key={l.id} href={`/switch/descobrir?lista=${l.id}`} scroll={false} className="relative shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium">
+              <Link key={l.id} href={href(platform, l.id)} scroll={false} className="relative shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium">
                 {list === l.id && <motion.span layoutId="discover-list" className="btn-accent absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
                 <span className={`relative ${list === l.id ? "text-white" : "text-white/70"}`}>{l.short}</span>
               </Link>
             ))}
           </nav>
           <button
-            onClick={() => setHideMine((v) => !v)}
+            onClick={toggleHide}
             aria-pressed={hideMine}
             className={`tap h-9 shrink-0 self-start rounded-full px-3.5 text-[13px] font-medium transition-colors sm:self-auto ${hideMine ? "btn-accent" : "glass text-white/75 hover:text-white"}`}
           >
@@ -111,7 +143,7 @@ export function DiscoverView({
                 return (
                   <div key={g.igdbId} className="rise" style={{ animationDelay: `${Math.min(idx, 18) * 20}ms` }}>
                     <div className="group relative">
-                      <Link href={item ? `/item/${item.id}` : `/jogo/${g.igdbId}`} aria-label={g.title} className="block">
+                      <Link href={item ? `/item/${item.id}` : `/jogo/${g.igdbId}?plataforma=${platform}`} aria-label={g.title} className="block">
                         {cover}
                       </Link>
                       {!item?.done && <BacklogButton on={!!item} busy={busy.has(g.igdbId)} onClick={() => toggle(g.igdbId)} />}
