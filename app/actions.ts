@@ -35,6 +35,14 @@ export async function togglePin(itemId: string) {
   return !item.pinned;
 }
 
+// Esconde/mostra o jogo no filtro de PC ou Switch (ex.: só quero jogar no Switch)
+export async function setHiddenPlatforms(itemId: string, platforms: string[]) {
+  await own(itemId);
+  const clean = [...new Set(platforms)].filter((p) => p === "PC" || p === "Switch");
+  await db.update(items).set({ hiddenPlatforms: clean }).where(eq(items.id, itemId));
+  refresh(itemId);
+}
+
 // "Visto" = some da lista. Guarda done_at por 1 dia para permitir desfazer; o cron apaga depois.
 export async function markDone(itemId: string) {
   await own(itemId);

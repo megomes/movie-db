@@ -4,12 +4,13 @@ import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { Download, ExternalLink, HardDrive, Heart, HeartOff, Loader2, Plus, Trash2, Trophy } from "lucide-react";
-import { addItem, deleteItem, markDone, togglePin } from "@/app/actions";
+import { Download, ExternalLink, Eye, EyeOff, HardDrive, Heart, HeartOff, Loader2, Plus, Trash2, Trophy } from "lucide-react";
+import { addItem, deleteItem, markDone, setHiddenPlatforms, togglePin } from "@/app/actions";
 import { formatSize } from "@/lib/kinds";
 import { useBacklog } from "./backlog-context";
 import { Cover } from "./cover";
-import { InstallDialog, type InstallPlatform } from "./install-dialog";
+import type { LiteItem } from "@/lib/queries";
+import { InstallDialog, Sheet, type InstallPlatform } from "./install-dialog";
 
 // Jogo alvo do menu: igdbId identifica no backlog e nos instalados; itemId ajuda quando já é um item do backlog
 export type MenuGame = { igdbId: number | null; title: string; coverUrl: string | null; itemId?: string | null; done?: boolean };
@@ -24,10 +25,16 @@ const PLATFORMS: { id: InstallPlatform; label: string }[] = [
   { id: "pc", label: "PC" },
 ];
 
+// Plataformas dos filtros de Jogos (nomes do IGDB)
+const VIEW_PLATFORMS = ["PC", "Switch"] as const;
+type ViewPlatform = (typeof VIEW_PLATFORMS)[number];
+const visibleOn = (i: LiteItem) => VIEW_PLATFORMS.filter((p) => i.platforms.includes(p) && !i.hiddenPlatforms.includes(p));
+
 // Menu de botão direito dos jogos (qualquer tela): backlog, prioridade, zerado, instalado no Switch/PC
 export function GameMenuProvider({ children }: { children: React.ReactNode }) {
   const [menu, setMenu] = useState<{ x: number; y: number; game: MenuGame } | null>(null);
   const [install, setInstall] = useState<{ game: MenuGame & { igdbId: number }; platform: InstallPlatform } | null>(null);
+  const [hideAll, setHideAll] = useState<{ item: LiteItem; platform: ViewPlatform } | null>(null);
   const { installed } = useBacklog();
   const router = useRouter();
 
@@ -52,8 +59,13 @@ export function GameMenuProvider({ children }: { children: React.ReactNode }) {
             setInstall({ game: { ...menu.game, igdbId: menu.game.igdbId }, platform });
             setMenu(null);
           }}
+          onHideAll={(item, platform) => {
+            setHideAll({ item, platform });
+            setMenu(null);
+          }}
         />
       )}
+      <AnimatePresence>{hideAll && <HideAllDialog {...hideAll} onClose={() => setHideAll(null)} />}</AnimatePresence>
       <AnimatePresence>
         {install && (
           <InstallDialog
@@ -75,12 +87,14 @@ function Menu({
   game,
   onClose,
   onInstall,
+  onHideAll,
 }: {
   x: number;
   y: number;
   game: MenuGame;
   onClose: () => void;
   onInstall: (p: InstallPlatform) => void;
+  onHideAll: (item: LiteItem, p: ViewPlatform) => void;
 }) {
   const router = useRouter();
   const { items, installed } = useBacklog();
@@ -195,6 +209,31 @@ function Menu({
         </>
       )}
 
+      {/* Esconder do PC/Switch: some daquele filtro, fica só no outro */}
+      {item && VIEW_PLATFORMS.some((p) => item.platforms.includes(p)) && (
+        <>
+          <Sep />
+          {VIEW_PLATFORMS.filter((p) => item.platforms.includes(p)).map((p) => {
+            const hidden = item.hiddenPlatforms.includes(p);
+            return (
+              <Row
+                key={p}
+                busy={busy}
+                id={`hide-${p}`}
+                icon={hidden ? <Eye size={15} /> : <EyeOff size={15} />}
+                label={hidden ? `Mostrar no ${p}` : `Esconder do ${p}`}
+                onClick={() => {
+                  if (hidden) return run(`hide-${p}`, () => setHiddenPlatforms(item.id, item.hiddenPlatforms.filter((x) => x !== p)));
+                  // Era a última plataforma em que ele aparece: pergunta antes
+                  if (visibleOn(item).every((x) => x === p)) return onHideAll(item, p);
+                  run(`hide-${p}`, () => setHiddenPlatforms(item.id, [...item.hiddenPlatforms, p]));
+                }}
+              />
+            );
+          })}
+        </>
+      )}
+
       <Sep />
       <Row
             busy={busy}
@@ -249,4 +288,65 @@ function Row({
 
 function Sep() {
   return <div className="mx-2 my-1 h-px bg-white/10" />;
+}
+
+// Esconder da última plataforma em que o jogo aparece = ele some das listas. Confirma e tira do backlog,
+// ou deixa mostrar no outro console (se o jogo sai nele e estava escondido lá).
+function HideAllDialog({ item, platform, onClose }: { item: LiteItem; platform: ViewPlatform; onClose: () => void }) {
+  const [busy, setBusy] = useState<"other" | "remove" | null>(null);
+  const [error, setError] = useState(false);
+  const other = VIEW_PLATFORMS.find((p) => p !== platform && item.platforms.includes(p));
+
+  async function act(kind: "other" | "remove") {
+    setBusy(kind);
+    setError(false);
+    try {
+      if (kind === "remove") await deleteItem(item.id);
+      else await setHiddenPlatforms(item.id, [platform]);
+      onClose();
+    } catch {
+      setError(true);
+      setBusy(null);
+    }
+  }
+
+  return (
+    <Sheet label="Vai sumir das listas" onClose={onClose}>
+      <div className="space-y-4 px-5 pb-5 pt-2">
+        <div className="flex items-center gap-3">
+          <div className="w-14 shrink-0">
+            <Cover item={{ id: item.id, title: item.title, kind: "game", coverUrl: item.coverUrl }} rounded="rounded-lg" />
+          </div>
+          <p className="min-w-0 flex-1 text-[14px] leading-snug text-white/80">
+            Escondendo do {platform}, <b className="text-white">{item.title}</b> não aparece mais no PC nem no Switch.{" "}
+            {other ? `Ele também sai para ${other}, onde está escondido.` : `Ele não sai para ${platform === "PC" ? "Switch" : "PC"}.`} Tirar do backlog?
+          </p>
+        </div>
+        {error && <p className="text-[13px] text-danger">Não deu certo. Tenta de novo.</p>}
+        <div className="space-y-2">
+          {other && (
+            <button
+              type="button"
+              onClick={() => act("other")}
+              disabled={!!busy}
+              className="btn-accent tap flex h-11 w-full items-center justify-center gap-2 rounded-full text-[15px] font-semibold disabled:opacity-50"
+            >
+              {busy === "other" ? <Loader2 size={17} className="animate-spin" /> : <Eye size={17} />} Mostrar só no {other}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => act("remove")}
+            disabled={!!busy}
+            className="tap flex h-11 w-full items-center justify-center gap-2 rounded-full bg-danger/15 text-[15px] font-semibold text-danger disabled:opacity-50"
+          >
+            {busy === "remove" ? <Loader2 size={17} className="animate-spin" /> : <Trash2 size={16} />} Sim, tirar do backlog
+          </button>
+          <button type="button" onClick={onClose} disabled={!!busy} className="glass tap flex h-11 w-full items-center justify-center rounded-full text-[15px] font-medium">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </Sheet>
+  );
 }

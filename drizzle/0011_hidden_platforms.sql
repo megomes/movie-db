@@ -1,0 +1,1 @@
+ALTER TABLE "items" ADD COLUMN "hidden_platforms" text[] DEFAULT '{}' NOT NULL;

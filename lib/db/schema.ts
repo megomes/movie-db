@@ -95,6 +95,8 @@ export const items = pgTable(
     // Jogos
     platforms: text("platforms").array().notNull().default([]),
     myPlatforms: text("my_platforms").array().notNull().default([]),
+    // Plataformas ("PC", "Switch") em que a pessoa não quer ver o jogo, mesmo que ele saia nelas
+    hiddenPlatforms: text("hidden_platforms").array().notNull().default([]),
     gamePass: boolean("game_pass").notNull().default(false),
     steamPrice: jsonb("steam_price").$type<SteamPrice | null>(),
 

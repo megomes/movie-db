@@ -128,7 +128,7 @@ export function ListBrowser({
     () => (i: LiteItem) => {
       const own = i.tagIds.filter((t) => tagMeta.has(t));
       if (i.kind !== "game") return own;
-      const plats = PLATFORM_FILTERS.filter((p) => i.platforms?.includes(p)).map((p) => `plat:${p}`);
+      const plats = PLATFORM_FILTERS.filter((p) => i.platforms?.includes(p) && !i.hiddenPlatforms?.includes(p)).map((p) => `plat:${p}`);
       return plats.length ? [...plats, ...own] : own;
     },
     [tagMeta],
