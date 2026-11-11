@@ -261,3 +261,10 @@ export async function removeSwitchGame(id: string) {
   await db.delete(switchGames).where(and(eq(switchGames.id, id), eq(switchGames.ownerId, user.id)));
   refresh();
 }
+
+// Backlog inteiro em markdown (com status), para colar em outro agente de IA
+export async function exportBacklogMarkdown() {
+  const user = await requireUser();
+  const { backlogMarkdown } = await import("@/lib/backlog-markdown");
+  return backlogMarkdown(user.id, user.name);
+}

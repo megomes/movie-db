@@ -8,6 +8,7 @@ import { AnimatePresence, motion, useMotionValueEvent, useScroll } from "motion/
 import { BookOpen, CircleCheckBig, Clapperboard, Dices, Eye, Gamepad2, HeartHandshake, House, LayoutGrid, ListChecks, LogOut, Plus, Search, Settings2, Tv, Users } from "lucide-react";
 import { authClient } from "@/lib/auth/client";
 import { AddFab, AddPill } from "./add-button";
+import { CopyBacklogButton } from "./copy-backlog";
 import { useBacklog } from "./backlog-context";
 import { DrawOverlay } from "./draw-overlay";
 import { PeopleSwitch } from "./people-switch";
@@ -176,6 +177,7 @@ function AvatarMenu() {
               <Link href="/ajustes" className={row}>
                 <Settings2 size={17} className="text-text-2" /> Configurações
               </Link>
+              <CopyBacklogButton className={`${row} w-full`} iconClass="flex text-text-2" size={17} onDone={() => setOpen(false)} />
               <button
                 className={`${row} w-full text-left`}
                 onClick={async () => {
@@ -366,6 +368,7 @@ function MobileMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
               </span>
               <span className="flex-1">Configurações</span>
             </Link>
+            <CopyBacklogButton className={`${row} w-full`} iconClass={icon} size={19} onDone={onClose} />
             <button
               data-close
               className={`${row} w-full text-left text-white/70`}
