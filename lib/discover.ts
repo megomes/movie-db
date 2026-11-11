@@ -2,7 +2,7 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { GAME_TYPES, igdb, img, PLATFORM } from "@/lib/sources/igdb";
 
-import { type DiscoverGame, type ListId } from "@/lib/discover-lists";
+import { PERIODS, type DiscoverGame, type ListId, type PeriodId } from "@/lib/discover-lists";
 
 export * from "@/lib/discover-lists";
 
@@ -54,14 +54,17 @@ async function byPopularity(type: number) {
   return out.sort((a, b) => order.get(a.id)! - order.get(b.id)!).slice(0, LIMIT);
 }
 
-async function fetchList(id: ListId): Promise<DiscoverGame[]> {
+async function fetchList(id: ListId, period: PeriodId = "todos"): Promise<DiscoverGame[]> {
   const now = Math.floor(Date.now() / 1000);
   const where = `platforms = ${SWITCH} & game_type = ${GAME_TYPES}`;
   let rows: Raw[];
   switch (id) {
-    case "top":
-      rows = await igdb<Raw[]>("games", `${FIELDS}; where ${where} & total_rating_count >= 40; sort total_rating desc; limit ${LIMIT};`);
+    case "top": {
+      const p = PERIODS.find((x) => x.id === period) ?? PERIODS[0];
+      const released = p.toDays == null ? "" : ` & first_release_date > ${now - p.toDays * 86400} & first_release_date <= ${now - p.fromDays * 86400}`;
+      rows = await igdb<Raw[]>("games", `${FIELDS}; where ${where}${released} & total_rating_count >= ${p.minRatings}; sort total_rating desc; limit ${LIMIT};`);
       break;
+    }
     case "hot":
       rows = await byPopularity(POPULARITY.visits);
       break;
@@ -82,4 +85,4 @@ async function fetchList(id: ListId): Promise<DiscoverGame[]> {
 }
 
 // Atualiza a cada 12h: as listas mudam devagar e o IGDB limita a 4 req/s
-export const getDiscoverList = unstable_cache(fetchList, ["discover-switch-v2"], { revalidate: 60 * 60 * 12 });
+export const getDiscoverList = unstable_cache(fetchList, ["discover-switch-v3"], { revalidate: 60 * 60 * 12 });

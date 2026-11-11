@@ -9,6 +9,19 @@ export const LISTS = [
 export type ListId = (typeof LISTS)[number]["id"];
 export const isListId = (v: unknown): v is ListId => LISTS.some((l) => l.id === v);
 
+// Janelas de lançamento dos "Melhores", sem sobreposição: cada uma começa onde a anterior termina.
+// Jogo recente tem poucas avaliações no IGDB, então o mínimo de avaliações cai junto com a janela.
+export const PERIODS = [
+  { id: "todos", label: "Todos", hint: "Nota mais alta, com pelo menos 40 avaliações", fromDays: null, toDays: null, minRatings: 40 },
+  { id: "1m", label: "Último mês", hint: "Lançados nos últimos 30 dias, com pelo menos 3 avaliações", fromDays: 0, toDays: 30, minRatings: 3 },
+  { id: "3m", label: "Último trimestre", hint: "Lançados entre 1 e 3 meses atrás, com pelo menos 3 avaliações", fromDays: 30, toDays: 91, minRatings: 3 },
+  { id: "6m", label: "Últimos 6 meses", hint: "Lançados entre 3 e 6 meses atrás, com pelo menos 3 avaliações", fromDays: 91, toDays: 182, minRatings: 3 },
+  { id: "1a", label: "Último ano", hint: "Lançados entre 6 meses e 1 ano atrás, com pelo menos 5 avaliações", fromDays: 182, toDays: 365, minRatings: 5 },
+  { id: "2a", label: "Últimos 2 anos", hint: "Lançados entre 1 e 2 anos atrás, com pelo menos 10 avaliações", fromDays: 365, toDays: 730, minRatings: 10 },
+] as const;
+export type PeriodId = (typeof PERIODS)[number]["id"];
+export const isPeriodId = (v: unknown): v is PeriodId => PERIODS.some((p) => p.id === v);
+
 export type DiscoverGame = {
   igdbId: number;
   title: string;
