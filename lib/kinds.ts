@@ -97,3 +97,9 @@ export const STATS_MIN = 5;
 
 // Semente nova a cada visita (prateleiras que variam sempre)
 export const visitSeed = () => Math.floor(Math.random() * 1e9);
+
+// Espaço em disco (jogos do Switch): "455 MB", "6,58 GB", "35,5 GB"
+export function formatSize(mb: number) {
+  if (mb < 1024) return `${mb} MB`;
+  return `${(mb / 1024).toLocaleString("pt-BR", { maximumFractionDigits: mb >= 10240 ? 1 : 2 })} GB`;
+}

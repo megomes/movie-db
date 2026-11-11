@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowLeft, Check, Compass, HardDrive, Loader2, Pencil, Plus, Search, Trophy, X } from "lucide-react";
 import { addSwitchGame, removeSwitchGame } from "@/app/actions";
+import { formatSize } from "@/lib/kinds";
 import type { SearchResult } from "@/lib/search";
 import { useSearch } from "./add-search";
 import { Cover } from "./cover";
@@ -27,11 +28,6 @@ const FILTERS = [
   { id: "out", label: "Fora do backlog" },
 ] as const;
 type FilterId = (typeof FILTERS)[number]["id"];
-
-export function formatSize(mb: number) {
-  if (mb < 1024) return `${mb} MB`;
-  return `${(mb / 1024).toLocaleString("pt-BR", { maximumFractionDigits: mb >= 10240 ? 1 : 2 })} GB`;
-}
 
 // Jogos instalados no Switch, do maior para o menor, com atalho para pôr/tirar do backlog
 export function SwitchView({
@@ -206,14 +202,12 @@ function SwitchCard({
       <div className={`group relative ${editing ? "wiggle" : ""}`} style={editing ? { animationDelay: `${(delay % 7) * -40}ms` } : undefined}>
         {editing ? (
           <div className="pointer-events-none">{cover}</div>
-        ) : item ? (
-          <Link href={`/item/${item.id}`} aria-label={g.title} className="block">
+        ) : item || g.igdbId != null ? (
+          <Link href={item ? `/item/${item.id}` : `/jogo/${g.igdbId}`} aria-label={g.title} className="block">
             {cover}
           </Link>
         ) : (
-          <button type="button" onClick={onToggle} disabled={g.igdbId == null} aria-label={`Adicionar ${g.title} ao backlog`} className="block w-full text-left disabled:cursor-default">
-            {cover}
-          </button>
+          cover
         )}
         {editing && (
           <button
