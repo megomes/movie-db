@@ -110,17 +110,29 @@ export function ListBrowser({
 
   const tagMeta = useMemo(() => new Map(tagList.map((t) => [t.id, t])), [tagList]);
   const ofKind = useMemo(() => (kind === "all" ? items : items.filter((i) => i.kind === kind)), [items, kind]);
+  // Filtro por tag. Em jogos, a tag de plataforma ("PC", "Switch") vale para todo jogo que sai nela, mesmo
+  // sem a tag: um jogo que sai nos dois aparece nos dois filtros.
+  const platformTag = useMemo(() => new Map(tagList.filter((t) => t.kind === "game").map((t) => [t.name, t.id])), [tagList]);
+  const filterTagsOf = useMemo(
+    () => (i: LiteItem) => {
+      const own = i.tagIds.filter((t) => tagMeta.has(t));
+      if (i.kind !== "game") return own;
+      const extra = (i.platforms ?? []).map((p) => platformTag.get(p)).filter((t): t is string => !!t && !own.includes(t));
+      return extra.length ? [...own, ...extra] : own;
+    },
+    [tagMeta, platformTag],
+  );
 
   const groups = useMemo((): TagGroup[] => {
     if (kind === "all") return [];
     const out: TagGroup[] = [];
-    const tagOpts = countBy(ofKind, (i) => i.tagIds.filter((t) => tagMeta.has(t)), (v) => tagMeta.get(v)?.name ?? v, 20).sort(
+    const tagOpts = countBy(ofKind, filterTagsOf, (v) => tagMeta.get(v)?.name ?? v, 20).sort(
       (a, b) => (tagMeta.get(a.value)?.position ?? 0) - (tagMeta.get(b.value)?.position ?? 0),
     );
     if (tagOpts.length) out.push({ id: "tag", label: "Tags", tags: tagOpts });
     if (kind !== "book") out.push({ id: "genre", label: "Gênero", tags: countBy(ofKind, genresOf, (v) => v, 12) });
     return out;
-  }, [kind, ofKind, tagMeta]);
+  }, [kind, ofKind, tagMeta, filterTagsOf]);
 
   const visible = useMemo(() => {
     const nq = normalize(q);
@@ -129,7 +141,7 @@ export function ListBrowser({
       if (onlyPinned && !i.pinned) return false;
       if (onlyMine && accessFor(i, ctx.myProviders).tier !== "mine") return false;
       if (onlySale && !(i.steamPrice?.discountPercent ?? 0)) return false;
-      if (filter.tag && !i.tagIds.includes(filter.tag)) return false;
+      if (filter.tag && !filterTagsOf(i).includes(filter.tag)) return false;
       if (filter.genre && !genresOf(i).includes(filter.genre)) return false;
       if (provider != null && !streamsOn(i).some((p) => p.id === provider)) return false;
       return true;
@@ -146,7 +158,7 @@ export function ListBrowser({
     };
     list = [...list].sort(cmp[sort]);
     return list;
-  }, [ofKind, q, filter, onlyPinned, onlyMine, onlySale, provider, sort, ctx.myProviders, seed, tagMeta]);
+  }, [ofKind, q, filter, onlyPinned, onlyMine, onlySale, provider, sort, ctx.myProviders, seed, tagMeta, filterTagsOf]);
 
   // Seus streamings que têm algo nesta divisão (filtro com o logo)
   const streamKinds = kind === "all" || kind === "movie" || kind === "series";

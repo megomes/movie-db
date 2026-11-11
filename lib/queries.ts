@@ -122,6 +122,7 @@ export function toLite(i: Item) {
     ratings: i.ratings,
     score: i.score,
     availability: i.availability,
+    platforms: i.platforms,
     myPlatforms: i.myPlatforms,
     gamePass: i.gamePass,
     steamPrice: i.steamPrice,
