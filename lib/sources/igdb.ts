@@ -64,6 +64,20 @@ export async function searchIgdb(query: string): Promise<(Candidate & { populari
   }));
 }
 
+// Screenshots de vários jogos de uma vez (até `per` por jogo), em tamanho de card
+export async function getIgdbScreenshots(ids: number[], per = 8): Promise<Map<number, string[]>> {
+  const out = new Map<number, string[]>();
+  for (let i = 0; i < ids.length; i += 50) {
+    const chunk = ids.slice(i, i + 50);
+    const rows = await igdb<{ game: number; image_id: string }[]>("screenshots", `fields game,image_id; where game = (${chunk.join(",")}); limit 500;`);
+    for (const r of rows) {
+      const list = out.get(r.game) ?? [];
+      if (list.length < per) out.set(r.game, [...list, img(r.image_id, "screenshot_big")!]);
+    }
+  }
+  return out;
+}
+
 type GameDetails = SearchGame & {
   summary?: string;
   genres?: { name: string }[];

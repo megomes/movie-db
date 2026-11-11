@@ -57,6 +57,20 @@
       "when": 1790386633879,
       "tag": "0007_tags",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794369179500,
+      "tag": "0008_switch_games",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794369556445,
+      "tag": "0009_switch_screenshots",
+      "breakpoints": true
     }
   ]
 }

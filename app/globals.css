@@ -189,6 +189,24 @@ body {
   animation: rise 520ms var(--ease-out) both;
 }
 
+/* Modo edição (ex.: tirar jogos do Switch): capas tremendo como na tela inicial do celular */
+@keyframes wiggle {
+  from {
+    rotate: -1.2deg;
+  }
+  to {
+    rotate: 1.2deg;
+  }
+}
+.wiggle {
+  animation: wiggle 0.3s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wiggle {
+    animation: none;
+  }
+}
+
 .press {
   transition: transform 180ms var(--ease-out);
 }

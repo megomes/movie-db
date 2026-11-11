@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowDownAZ, Baby, Check, ChevronDown, ChevronRight, Clock, Plus, Search, Shuffle, Sparkles, Star, X } from "lucide-react";
+import { ArrowDownAZ, Baby, Check, ChevronDown, ChevronRight, Clock, Gamepad2, Plus, Search, Shuffle, Sparkles, Star, X } from "lucide-react";
 import { COLLECTIONS, FAMILY_LIST } from "@/lib/collections";
 import type { Kind } from "@/lib/db/schema";
 import { normalize } from "@/lib/sources/http";
@@ -189,6 +189,11 @@ export function ListBrowser({
             </h1>
           )}
           <div className="flex items-center gap-2">
+            {!readOnly && !home && kind === "game" && (
+              <Link href="/switch" className="glass tap flex h-11 items-center gap-2 rounded-full pl-3 pr-4 text-[14px] font-medium text-white/85 hover:text-white">
+                <Gamepad2 size={17} /> <span className="hidden sm:inline">Meu Switch</span>
+              </Link>
+            )}
             {sort === "shuffle" && (
               <button onClick={() => setSeed((s) => s + 1)} className="glass tap flex h-11 w-11 items-center justify-center rounded-full" aria-label="Embaralhar de novo">
                 <Shuffle size={17} />

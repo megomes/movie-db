@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { db, items, profiles, pushSubscriptions, tags, type Kind } from "@/lib/db";
+import { db, items, profiles, pushSubscriptions, switchGames, tags, type Kind } from "@/lib/db";
+import { getIgdbScreenshots } from "@/lib/sources/igdb";
 import { requireUser } from "@/lib/session";
 import { isShared } from "@/lib/collections";
 import { enrich } from "@/lib/enrich";
@@ -216,4 +217,28 @@ export async function sendTestPush() {
   const user = await requireUser();
   const { notifyUser } = await import("@/lib/push");
   return notifyUser(user.id, { title: "Tudo certo!", body: "As notificações do Backlog estão funcionando.", url: "/" });
+}
+
+// Biblioteca do Switch: pôr um jogo (com o tamanho que ocupa) ou tirar
+export async function addSwitchGame(igdbId: number, title: string, sizeMb: number, coverUrl: string | null) {
+  const user = await requireUser();
+  const size = Math.round(sizeMb);
+  const name = title.trim();
+  if (!Number.isInteger(igdbId) || !name || !Number.isFinite(size) || size <= 0 || size > 1024 * 1024) throw new Error("Dados inválidos");
+  const cover = coverUrl?.startsWith("https://images.igdb.com/") ? coverUrl : null;
+  const screenshots = (await getIgdbScreenshots([igdbId]).catch(() => new Map<number, string[]>())).get(igdbId) ?? [];
+  const values = { ownerId: user.id, title: name, sizeMb: size, igdbId, coverUrl: cover, screenshots };
+  const [row] = await db
+    .insert(switchGames)
+    .values(values)
+    .onConflictDoUpdate({ target: [switchGames.ownerId, switchGames.title], set: { sizeMb: size, igdbId, coverUrl: cover, screenshots } })
+    .returning();
+  revalidatePath("/switch");
+  return row;
+}
+
+export async function removeSwitchGame(id: string) {
+  const user = await requireUser();
+  await db.delete(switchGames).where(and(eq(switchGames.id, id), eq(switchGames.ownerId, user.id)));
+  revalidatePath("/switch");
 }

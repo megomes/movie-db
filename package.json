@@ -10,6 +10,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "import:obsidian": "tsx --env-file=.env.local scripts/import-obsidian.ts",
+    "import:switch": "tsx --env-file=.env.local scripts/import-switch.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
