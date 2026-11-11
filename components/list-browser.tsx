@@ -38,8 +38,9 @@ const streamsOn = (i: LiteItem) => (i.availability ? [...(i.availability.flatrat
 // "Amazon Prime Video" → "Prime Video", "Netflix Standard with Ads" → "Netflix"
 const shortName = (n: string) => n.replace(/^Amazon /, "").replace(/ (Standard|Basic) with Ads$/, "").replace(/ Amazon Channel$/, "");
 
-// Plataformas que viram filtro na aba Jogos (vêm do IGDB)
+// Plataformas que viram filtro na aba Jogos (vêm do IGDB); a aba abre no PC
 const PLATFORM_FILTERS = ["PC", "Switch"] as const;
+const DEFAULT_GAME_FILTER = "plat:PC";
 
 function countBy(items: LiteItem[], pick: (i: LiteItem) => string[], label: (v: string) => string, limit = 14): TagOption[] {
   const m = new Map<string, number>();
@@ -79,8 +80,13 @@ export function ListBrowser({
   const kindParam = mode === "home" ? null : sp.get("k");
   const kind: Kind | "all" = KINDS.includes(kindParam as Kind) ? (kindParam as Kind) : "all";
   const [sort, setSort] = useState<SortId>(SORTS.some((s) => s.id === sp.get("sort")) ? (sp.get("sort") as SortId) : "score");
-  // Filtros ficam na URL: voltar de um item reabre a lista do jeito que estava
-  const [filter, setFilter] = useState<{ tag: string | null; genre: string | null }>({ tag: sp.get("tag"), genre: sp.get("genero") });
+  // Filtros ficam na URL: voltar de um item reabre a lista do jeito que estava.
+  // Jogos abrem no PC; "tag=" vazio na URL guarda que a pessoa desligou o filtro.
+  const defaultTag = kind === "game" ? DEFAULT_GAME_FILTER : null;
+  const [filter, setFilter] = useState<{ tag: string | null; genre: string | null }>({
+    tag: sp.has("tag") ? sp.get("tag") || null : defaultTag,
+    genre: sp.get("genero"),
+  });
   const [onlyPinned, setOnlyPinned] = useState(sp.get("fav") === "1");
   const [onlyMine, setOnlyMine] = useState(sp.get("f") === "mine" || sp.get("meu") === "1");
   const [provider, setProvider] = useState<number | null>(Number(sp.get("streaming")) || null);
@@ -92,7 +98,7 @@ export function ListBrowser({
   const [lastKind, setLastKind] = useState(kind);
   if (lastKind !== kind) {
     setLastKind(kind);
-    setFilter({ tag: null, genre: null });
+    setFilter({ tag: defaultTag, genre: null });
     setProvider(null);
   }
 
@@ -102,7 +108,8 @@ export function ListBrowser({
     const put = (k: string, v: string | null | false) => (v ? p.set(k, v) : p.delete(k));
     p.delete("f");
     put("sort", sort !== "score" && sort);
-    put("tag", filter.tag);
+    if (filter.tag === defaultTag) p.delete("tag");
+    else p.set("tag", filter.tag ?? "");
     put("genero", filter.genre);
     put("fav", onlyPinned && "1");
     put("meu", onlyMine && "1");
@@ -111,7 +118,7 @@ export function ListBrowser({
     put("q", q.trim() && q);
     const next = p.toString();
     if (next !== window.location.search.slice(1)) window.history.replaceState(null, "", `${window.location.pathname}${next ? `?${next}` : ""}`);
-  }, [mode, sort, filter, onlyPinned, onlyMine, onlySale, provider, q]);
+  }, [mode, sort, filter, onlyPinned, onlyMine, onlySale, provider, q, defaultTag]);
 
   const tagMeta = useMemo(() => new Map(tagList.map((t) => [t.id, t])), [tagList]);
   const ofKind = useMemo(() => (kind === "all" ? items : items.filter((i) => i.kind === kind)), [items, kind]);
@@ -183,7 +190,8 @@ export function ListBrowser({
     return m;
   }, [ctx.installed]);
   const installedLabel = (i: LiteItem) => {
-    const rows = i.igdbId != null ? installedBy.get(i.igdbId) : undefined;
+    const plat = filter.tag === "plat:PC" ? "pc" : filter.tag === "plat:Switch" ? "switch" : null;
+    const rows = i.igdbId != null ? installedBy.get(i.igdbId)?.filter((r) => !plat || r.platform === plat) : undefined;
     return rows?.map((r) => `${r.platform === "pc" ? "PC" : "Switch"} ${formatSize(r.sizeMb)}`).join(" · ");
   };
 
@@ -191,10 +199,10 @@ export function ListBrowser({
   const sections = useMemo((): Section[] => {
     const filtering = !!q || !!filter.tag || !!filter.genre || onlyPinned || onlyMine || onlySale || provider != null;
     if (gameGroups) {
-      const isInst = (i: LiteItem) => i.igdbId != null && installedBy.has(i.igdbId);
+      const plat = filter.tag?.startsWith("plat:") ? (filter.tag.slice(5) === "PC" ? "pc" : "switch") : null;
+      const isInst = (i: LiteItem) => i.igdbId != null && (installedBy.get(i.igdbId) ?? []).some((r) => !plat || r.platform === plat);
       // Instalados que não estão no backlog também entram (só a busca e o filtro de plataforma valem para eles)
       const mine = new Set(items.filter((i) => i.kind === "game").map((i) => i.igdbId));
-      const plat = filter.tag?.startsWith("plat:") ? (filter.tag.slice(5) === "PC" ? "pc" : "switch") : null;
       const otherFilters = !!filter.genre || (!!filter.tag && !plat) || onlyPinned || onlyMine || onlySale || provider != null;
       const nq = normalize(q);
       const seen = new Set<number>();

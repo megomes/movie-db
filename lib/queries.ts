@@ -212,20 +212,3 @@ export async function listInstalled(ownerId: string) {
   return rows.map((r) => ({ ...r, igdbId: r.igdbId!, platform: r.platform as InstallPlatform }));
 }
 export type InstalledLite = Awaited<ReturnType<typeof listInstalled>>[number];
-
-// Jogos do backlog (ainda não zerados) que saem para Switch, pelo IGDB, e não estão instalados
-export async function switchBacklogNotInstalled(ownerId: string, installedIgdb: number[]) {
-  return db
-    .select({ id: items.id, title: items.title, igdbId: items.igdbId, coverUrl: items.coverUrl, gallery: items.gallery, minutes: items.minutes })
-    .from(items)
-    .where(
-      and(
-        eq(items.ownerId, ownerId),
-        eq(items.kind, "game"),
-        isNull(items.doneAt),
-        sql`'Switch' = any(${items.platforms})`,
-        installedIgdb.length ? sql`(${items.igdbId} is null or ${items.igdbId} <> all(${sql.raw(`array[${installedIgdb.map(Number).join(",")}]::int[]`)}))` : undefined,
-      ),
-    )
-    .orderBy(desc(items.pinned), desc(items.score));
-}
