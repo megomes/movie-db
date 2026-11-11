@@ -86,13 +86,16 @@ async function fetchList(platformId: PlatformId, id: ListId, period: PeriodId = 
 // Atualiza a cada 12h: as listas mudam devagar e o IGDB limita a 4 req/s
 export const getDiscoverList = unstable_cache(fetchList, ["discover-v4"], { revalidate: 60 * 60 * 12 });
 
+// Cada grupo dos "Melhores" mostra no máximo isso (o de todos os tempos só pula os que apareceram)
+const PER_GROUP = 60;
+
 // Lista pronta para a página: "Melhores" vem em grupos por data de lançamento (o de todos os tempos sem repetir os de cima)
 export async function getDiscoverGroups(platform: PlatformId, id: ListId): Promise<DiscoverGroup[]> {
   if (id !== "top") return [{ id, title: null, hint: null, games: await getDiscoverList(platform, id) }];
   const lists = await Promise.all(PERIODS.map((p) => getDiscoverList(platform, "top", p.id)));
   const seen = new Set<number>();
   return PERIODS.map((p, i) => {
-    const games = lists[i].filter((g) => !seen.has(g.igdbId));
+    const games = lists[i].filter((g) => !seen.has(g.igdbId)).slice(0, PER_GROUP);
     for (const g of games) seen.add(g.igdbId);
     return { id: p.id, title: p.label, hint: p.hint, games };
   }).filter((g) => g.games.length);
