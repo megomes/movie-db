@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { CircleCheckBig, Download, ExternalLink, Eye, EyeOff, HardDrive, Heart, HeartOff, Loader2, Plus, Trash2, Trophy } from "lucide-react";
+import { BookCheck, CircleCheckBig, Download, ExternalLink, Eye, EyeOff, HardDrive, Heart, HeartOff, Loader2, Plus, Trash2, Trophy } from "lucide-react";
 import { addItem, addSeen, deleteItem, markDone, setHiddenPlatforms, togglePin } from "@/app/actions";
 import { formatSize } from "@/lib/kinds";
 import { useBacklog } from "./backlog-context";
@@ -15,7 +15,7 @@ import { InstallDialog, Sheet, type InstallPlatform } from "./install-dialog";
 // Alvo do menu: jogo (igdbId identifica no backlog e nos instalados) ou filme/série (tmdbId); itemId ajuda quando já é
 // um item do backlog. onSeen avisa a tela quando vira "já vi / já zerei" (ex.: as sugestões escondem na hora).
 export type MenuGame = {
-  kind?: "game" | "movie" | "series";
+  kind?: "game" | "movie" | "series" | "book";
   igdbId: number | null;
   tmdbId?: number | null;
   title: string;
@@ -29,6 +29,62 @@ const OpenMenu = createContext<(e: React.MouseEvent, game: MenuGame) => void>(()
 
 /** Handler para onContextMenu: abre o menu do jogo no lugar do clique */
 export const useGameMenu = () => useContext(OpenMenu);
+
+// Engole o clique que o navegador manda ao soltar o dedo depois de segurar (senão abriria o link do card)
+function swallowNextClick() {
+  const stop = (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  window.addEventListener("click", stop, { capture: true, once: true });
+  setTimeout(() => window.removeEventListener("click", stop, { capture: true }), 700);
+}
+
+const HOLD_MS = 450;
+
+/**
+ * Props para o card: botão direito no computador e segurar o dedo no celular abrem o mesmo menu.
+ * Uso: <div {...menuProps({ ... })}>
+ */
+export function useMenuTrigger() {
+  const open = useContext(OpenMenu);
+  const hold = useRef<{ timer: number; x: number; y: number } | null>(null);
+  return useCallback(
+    (game: MenuGame) => {
+      const cancel = () => {
+        if (hold.current) clearTimeout(hold.current.timer);
+        hold.current = null;
+      };
+      return {
+        onContextMenu: (e: React.MouseEvent) => open(e, game),
+        onTouchStart: (e: React.TouchEvent) => {
+          if (e.touches.length !== 1) return cancel();
+          const { clientX: x, clientY: y } = e.touches[0];
+          cancel();
+          const timer = window.setTimeout(() => {
+            hold.current = null;
+            navigator.vibrate?.(12);
+            swallowNextClick();
+            open({ clientX: x, clientY: y, preventDefault() {}, stopPropagation() {} } as React.MouseEvent, game);
+          }, HOLD_MS);
+          hold.current = { timer, x, y };
+        },
+        // Mexeu o dedo (rolando a tela): não é segurar
+        onTouchMove: (e: React.TouchEvent) => {
+          const h = hold.current;
+          const t = e.touches[0];
+          if (h && Math.hypot(t.clientX - h.x, t.clientY - h.y) > 10) cancel();
+        },
+        onTouchEnd: cancel,
+        onTouchCancel: cancel,
+      };
+    },
+    [open],
+  );
+}
+
+/** Classes para o card que abre o menu segurando: sem seleção de texto nem o menu do sistema (iOS) */
+export const HOLD_CLASS = "select-none [-webkit-touch-callout:none]";
 
 const PLATFORMS: { id: InstallPlatform; label: string }[] = [
   { id: "switch", label: "Switch" },
@@ -123,6 +179,7 @@ function Menu({
     (target != null ? items.find((i) => i.kind === kind && (isGame ? i.igdbId : i.tmdbId) === target) : undefined);
   const mine = isGame && game.igdbId != null ? installed.filter((r) => r.igdbId === game.igdbId) : [];
   const seenLabel = isGame ? "Já joguei" : "Já vi";
+  const isBook = kind === "book";
 
   // Cabe na tela: abre para o outro lado perto das bordas
   useLayoutEffect(() => {
@@ -204,8 +261,8 @@ function Menu({
           <Row
             busy={busy}
             id="done"
-            icon={isGame ? <Trophy size={15} /> : <CircleCheckBig size={15} />}
-            label={isGame ? "Marcar como zerado" : "Já vi"}
+            icon={isGame ? <Trophy size={15} /> : isBook ? <BookCheck size={15} /> : <CircleCheckBig size={15} />}
+            label={isGame ? "Marcar como zerado" : isBook ? "Já li" : "Já vi"}
             onClick={() => {
               game.onSeen?.();
               fast(item.id, null, () => markDone(item.id));
@@ -214,7 +271,7 @@ function Menu({
         </>
       ) : game.done ? (
         <p className="flex items-center gap-2.5 px-2.5 py-2 text-[13.5px] text-text-3">
-          {isGame ? <Trophy size={15} /> : <CircleCheckBig size={15} />} {isGame ? "Já zerado" : "Já visto"}
+          {isGame ? <Trophy size={15} /> : <CircleCheckBig size={15} />} {isGame ? "Já zerado" : isBook ? "Já lido" : "Já visto"}
         </p>
       ) : (
         target != null && (

@@ -10,12 +10,12 @@ import { accessFor, formatMinutes, KIND_META, scoreLabel } from "@/lib/kinds";
 import type { LiteItem } from "@/lib/queries";
 import { useBacklog } from "./backlog-context";
 import { Cover } from "./cover";
-import { useGameMenu } from "./game-menu";
+import { HOLD_CLASS, useMenuTrigger } from "./game-menu";
 import { KIND_ICONS } from "./kind-icon";
 
 // Pôster interativo: inclina com o mouse (desktop), mostra nota e revela infos no hover.
 // Com screenshots (jogos) ou cenas (filmes e séries): em vez de inclinar, o mouse passeia pelas imagens.
-// Botão direito abre o menu (backlog, prioridade, visto/zerado), menos em livros.
+// Botão direito (ou segurar o dedo, no celular) abre o menu: prioridade, visto/zerado/lido, tirar do backlog.
 export function Poster({
   item,
   morph = false,
@@ -38,7 +38,7 @@ export function Poster({
   installed?: string;
 }) {
   const { myProviders } = useBacklog();
-  const openMenu = useGameMenu();
+  const menuProps = useMenuTrigger();
   const shots = item.shots ?? [];
   const [shot, setShot] = useState<number | null>(null);
   const preloaded = useRef(false);
@@ -55,13 +55,9 @@ export function Poster({
   return (
     <Link
       href={href ?? `/item/${item.id}`}
-      className="group relative block outline-none hover:z-10"
+      className={`group relative block outline-none hover:z-10 ${HOLD_CLASS}`}
       aria-label={item.title}
-      onContextMenu={
-        item.kind === "book"
-          ? undefined
-          : (e) => openMenu(e, { kind: item.kind as "game" | "movie" | "series", igdbId: item.igdbId, tmdbId: item.tmdbId, title: item.title, coverUrl: item.coverUrl, itemId: item.id })
-      }
+      {...menuProps({ kind: item.kind, igdbId: item.igdbId, tmdbId: item.tmdbId, title: item.title, coverUrl: item.coverUrl, itemId: item.id })}
       onPointerEnter={(e) => {
         if (e.pointerType !== "mouse" || !shots.length || preloaded.current) return;
         preloaded.current = true;

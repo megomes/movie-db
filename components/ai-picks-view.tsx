@@ -9,7 +9,7 @@ import { AI_SOURCES, aiSource, categoriesFor, type AiKind } from "@/lib/ai-picks
 import { ptGenre } from "@/lib/genres";
 import type { AiSuggestion } from "@/lib/queries";
 import { GUTTER } from "./rail";
-import { useGameMenu } from "./game-menu";
+import { HOLD_CLASS, useMenuTrigger } from "./game-menu";
 import { BacklogButton, ShotCover, useBacklogToggle, type BacklogRef } from "./shot-cover";
 
 const KINDS: { id: AiKind; label: string }[] = [
@@ -25,7 +25,7 @@ const reasonsOf = (g: AiSuggestion) => AI_SOURCES.filter((s) => g.reasons[s.id])
 // O que outras IAs sugeriram a partir do backlog exportado: por categoria, com a tag e o motivo de quem sugeriu
 export function AiPicksView({ kind, games, backlog }: { kind: AiKind; games: AiSuggestion[]; backlog: Record<number, BacklogRef> }) {
   const { owned, busy, toggle } = useBacklogToggle(backlog, kind);
-  const openMenu = useGameMenu();
+  const menuProps = useMenuTrigger();
   const sp = useSearchParams();
   // Filtros ficam na URL: voltar de um item reabre do mesmo jeito
   const [ai, setAi] = useState<string | null>(AI_SOURCES.some((s) => s.id === sp.get("ia")) ? sp.get("ia") : null);
@@ -157,9 +157,8 @@ export function AiPicksView({ kind, games, backlog }: { kind: AiKind; games: AiS
                       >
                         <div className="rise" style={{ animationDelay: `${Math.min(idx, 18) * 20}ms` }}>
                           <div
-                            className="group relative"
-                            onContextMenu={(e) =>
-                              openMenu(e, {
+                            className={`group relative ${HOLD_CLASS}`}
+                            {...menuProps({
                                 kind,
                                 igdbId: kind === "game" ? g.ref : null,
                                 tmdbId: kind === "game" ? null : g.ref,
@@ -168,8 +167,7 @@ export function AiPicksView({ kind, games, backlog }: { kind: AiKind; games: AiS
                                 itemId: item?.id,
                                 done: item?.done,
                                 onSeen: () => setSeen((prev) => new Set(prev).add(g.ref)),
-                              })
-                            }
+                              })}
                           >
                             <Link
                               href={href}

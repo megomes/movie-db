@@ -8,7 +8,7 @@ import { ArrowLeft, Gamepad2 } from "lucide-react";
 import { LISTS, platformOf, PLATFORMS, type DiscoverGroup, type ListId, type PlatformId } from "@/lib/discover-lists";
 import { ptGenre } from "@/lib/genres";
 import { GUTTER } from "./rail";
-import { useGameMenu } from "./game-menu";
+import { HOLD_CLASS, useMenuTrigger } from "./game-menu";
 import { BacklogButton, ShotCover, useBacklogToggle, type BacklogRef } from "./shot-cover";
 
 const dateFmt = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
@@ -28,7 +28,7 @@ export function DiscoverView({
   installed: number[];
 }) {
   const { owned, busy, toggle } = useBacklogToggle(backlog);
-  const openMenu = useGameMenu();
+  const menuProps = useMenuTrigger();
   const installed = useMemo(() => new Set(installedIds), [installedIds]);
   const sp = useSearchParams();
   // Fica na URL (e passa entre listas/plataformas): voltar de um jogo reabre do mesmo jeito
@@ -140,8 +140,8 @@ export function DiscoverView({
                 return (
                   <div key={g.igdbId} className="rise" style={{ animationDelay: `${Math.min(idx, 18) * 20}ms` }}>
                     <div
-                      className="group relative"
-                      onContextMenu={(e) => openMenu(e, { igdbId: g.igdbId, title: g.title, coverUrl: g.coverUrl, itemId: item?.id, done: item?.done })}
+                      className={`group relative ${HOLD_CLASS}`}
+                      {...menuProps({ igdbId: g.igdbId, title: g.title, coverUrl: g.coverUrl, itemId: item?.id, done: item?.done })}
                     >
                       <Link href={item ? `/item/${item.id}` : `/jogo/${g.igdbId}`} aria-label={g.title} className="block">
                         {cover}
