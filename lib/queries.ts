@@ -129,8 +129,8 @@ export function toLite(i: Item) {
     myPlatforms: i.myPlatforms,
     igdbId: i.igdbId,
     hiddenPlatforms: i.hiddenPlatforms,
-    // Screenshots (jogos) para passear com o mouse na capa
-    shots: i.kind === "game" ? i.gallery.slice(0, 8).map((u) => artSrc(u, "md")!) : [],
+    // Screenshots (jogos) e cenas (filmes e séries) para passear com o mouse na capa
+    shots: i.kind === "book" ? [] : i.gallery.slice(0, 8).map((u) => artSrc(u, "md")!),
     gamePass: i.gamePass,
     steamPrice: i.steamPrice,
     minutes: i.minutes,

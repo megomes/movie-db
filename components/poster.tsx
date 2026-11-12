@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element -- screenshots vêm direto do CDN do IGDB */
+/* eslint-disable @next/next/no-img-element -- screenshots e cenas vêm direto do CDN do IGDB/TMDB */
 "use client";
 
 import Link from "next/link";
@@ -14,7 +14,8 @@ import { useGameMenu } from "./game-menu";
 import { KIND_ICONS } from "./kind-icon";
 
 // Pôster interativo: inclina com o mouse (desktop), mostra nota e revela infos no hover.
-// Jogo com screenshots: em vez de inclinar, o mouse passeia pelas screenshots; botão direito abre o menu do jogo.
+// Com screenshots (jogos) ou cenas (filmes e séries): em vez de inclinar, o mouse passeia pelas imagens.
+// Jogo: botão direito abre o menu do jogo.
 export function Poster({
   item,
   morph = false,
@@ -39,7 +40,7 @@ export function Poster({
   const { myProviders } = useBacklog();
   const openMenu = useGameMenu();
   const game = item.kind === "game";
-  const shots = game ? (item.shots ?? []) : [];
+  const shots = item.shots ?? [];
   const [shot, setShot] = useState<number | null>(null);
   const preloaded = useRef(false);
   const mx = useMotionValue(0);
