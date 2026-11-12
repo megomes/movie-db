@@ -182,6 +182,28 @@ export const switchGames = pgTable(
 
 export type SwitchGame = typeof switchGames.$inferSelect;
 
+// Jogos sugeridos por outras IAs (a partir do backlog exportado), com quais IAs sugeriram cada um
+export const aiSuggestions = pgTable(
+  "ai_suggestions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: text("owner_id").notNull(),
+    igdbId: integer("igdb_id").notNull(),
+    title: text("title").notNull(),
+    year: integer("year"),
+    coverUrl: text("cover_url"),
+    screenshots: text("screenshots").array().notNull().default([]),
+    genres: text("genres").array().notNull().default([]),
+    rating: integer("rating"),
+    // Ex.: ["Claude", "ChatGPT", "Grok"]
+    sources: text("sources").array().notNull().default([]),
+    // Categoria normalizada (lib/ai-picks.ts): a que mais IAs usaram para esse jogo
+    category: text("category"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("ai_suggestions_owner_igdb").on(t.ownerId, t.igdbId)],
+);
+
 export const profiles = pgTable("profiles", {
   userId: text("user_id").primaryKey(),
   email: text("email").notNull(),

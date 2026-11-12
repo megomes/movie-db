@@ -85,6 +85,20 @@
       "when": 1794416289665,
       "tag": "0011_hidden_platforms",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1794441025397,
+      "tag": "0012_ai_suggestions",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1794441625370,
+      "tag": "0013_ai_suggestion_category",
+      "breakpoints": true
     }
   ]
 }

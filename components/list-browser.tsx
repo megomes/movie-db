@@ -269,9 +269,19 @@ export function ListBrowser({
           )}
           <div className="flex items-center gap-2">
             {!readOnly && !home && kind === "game" && (
-              <Link href="/descobrir" className="glass tap flex h-11 items-center gap-2 rounded-full pl-3 pr-4 text-[14px] font-medium text-white/85 hover:text-white" aria-label="Descobrir">
-                <Compass size={17} /> <span className="hidden sm:inline">Descobrir</span>
-              </Link>
+              <>
+                <Link href="/descobrir" className="glass tap flex h-11 items-center gap-2 rounded-full pl-3 pr-4 text-[14px] font-medium text-white/85 hover:text-white" aria-label="Descobrir">
+                  <Compass size={17} /> <span className="hidden sm:inline">Descobrir</span>
+                </Link>
+                <Link
+                  href="/sugestoes"
+                  className="glass tap flex h-11 w-11 items-center justify-center rounded-full text-white/85 hover:text-white"
+                  aria-label="Sugestões das IAs"
+                  title="Sugestões das IAs"
+                >
+                  <Sparkles size={18} />
+                </Link>
+              </>
             )}
             {sort === "shuffle" && (
               <button onClick={() => setSeed((s) => s + 1)} className="glass tap flex h-11 w-11 items-center justify-center rounded-full" aria-label="Embaralhar de novo">

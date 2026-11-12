@@ -1,7 +1,7 @@
 import "server-only";
 import { and, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { asc } from "drizzle-orm";
-import { db, items, profiles, switchGames, tags, type Item } from "@/lib/db";
+import { aiSuggestions, db, items, profiles, switchGames, tags, type Item } from "@/lib/db";
 import { artSrc } from "@/lib/img";
 import { hoursOf } from "@/lib/kinds";
 
@@ -213,3 +213,22 @@ export async function listInstalled(ownerId: string) {
   return rows.map((r) => ({ ...r, igdbId: r.igdbId!, platform: r.platform as InstallPlatform }));
 }
 export type InstalledLite = Awaited<ReturnType<typeof listInstalled>>[number];
+
+// Jogos que outras IAs sugeriram (tela "Sugestões das IAs")
+export async function listAiSuggestions(ownerId: string) {
+  return db
+    .select({
+      igdbId: aiSuggestions.igdbId,
+      title: aiSuggestions.title,
+      year: aiSuggestions.year,
+      coverUrl: aiSuggestions.coverUrl,
+      screenshots: aiSuggestions.screenshots,
+      genres: aiSuggestions.genres,
+      rating: aiSuggestions.rating,
+      sources: aiSuggestions.sources,
+      category: aiSuggestions.category,
+    })
+    .from(aiSuggestions)
+    .where(eq(aiSuggestions.ownerId, ownerId));
+}
+export type AiSuggestion = Awaited<ReturnType<typeof listAiSuggestions>>[number];
