@@ -15,6 +15,27 @@ export const AI_CATEGORIES = [
   { id: "relax", label: "Relaxantes e exploração", emoji: "🌿" },
 ] as const;
 
+// Filmes e séries: as categorias de cada IA, unificadas
+export const MEDIA_CATEGORIES = [
+  { id: "adaptacao", label: "Adaptações de livros da sua lista", emoji: "📚" },
+  { id: "scifi", label: "Ficção científica", emoji: "🛸" },
+  { id: "tempo", label: "Tempo, realidade e mente", emoji: "🌀" },
+  { id: "espaco", label: "Espaço", emoji: "🚀" },
+  { id: "corrida", label: "Corrida e aviação", emoji: "🏎️" },
+  { id: "espionagem", label: "Espionagem, política e poder", emoji: "🕵️" },
+  { id: "crime", label: "Crime e suspense", emoji: "🔪" },
+  { id: "negocios", label: "Tecnologia, negócios e golpes", emoji: "💰" },
+  { id: "guerra", label: "Guerra e história", emoji: "⚔️" },
+  { id: "drama", label: "Drama e obsessão", emoji: "🎭" },
+  { id: "terror", label: "Terror e estranheza", emoji: "🩸" },
+  { id: "comedia", label: "Comédia", emoji: "😂" },
+  { id: "docs", label: "Documentários", emoji: "🎬" },
+] as const;
+
+export type AiKind = "game" | "movie" | "series";
+export const categoriesFor = (kind: AiKind): readonly { id: string; label: string; emoji: string }[] =>
+  kind === "game" ? AI_CATEGORIES : MEDIA_CATEGORIES;
+
 export const AI_SOURCES: { id: string; short: string; color: string; ink: string }[] = [
   { id: "Claude", short: "Claude", color: "#D97757", ink: "#fff" },
   { id: "ChatGPT", short: "GPT", color: "#10A37F", ink: "#fff" },

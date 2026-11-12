@@ -1,7 +1,7 @@
 import "server-only";
 import { and, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { asc } from "drizzle-orm";
-import { aiSuggestions, db, items, profiles, switchGames, tags, type Item } from "@/lib/db";
+import { aiSuggestions, db, items, profiles, switchGames, tags, type Item, type Kind } from "@/lib/db";
 import { artSrc } from "@/lib/img";
 import { hoursOf } from "@/lib/kinds";
 
@@ -128,6 +128,7 @@ export function toLite(i: Item) {
     platforms: i.platforms,
     myPlatforms: i.myPlatforms,
     igdbId: i.igdbId,
+    tmdbId: i.tmdbId,
     hiddenPlatforms: i.hiddenPlatforms,
     // Screenshots (jogos) e cenas (filmes e séries) para passear com o mouse na capa
     shots: i.kind === "book" ? [] : i.gallery.slice(0, 8).map((u) => artSrc(u, "md")!),
@@ -179,6 +180,16 @@ export async function backlogByIgdb(ownerId: string, igdbIds: number[]) {
   return Object.fromEntries(rows.map((r) => [r.igdbId!, { id: r.id, done: !!r.doneAt }])) as Record<number, { id: string; done: boolean }>;
 }
 
+// Mesmo que backlogByIgdb, para filmes e séries (pelo id do TMDB)
+export async function backlogByTmdb(ownerId: string, kind: "movie" | "series", tmdbIds: number[]) {
+  if (!tmdbIds.length) return {};
+  const rows = await db
+    .select({ id: items.id, tmdbId: items.tmdbId, doneAt: items.doneAt })
+    .from(items)
+    .where(and(eq(items.ownerId, ownerId), eq(items.kind, kind), inArray(items.tmdbId, tmdbIds)));
+  return Object.fromEntries(rows.map((r) => [r.tmdbId!, { id: r.id, done: !!r.doneAt }])) as Record<number, { id: string; done: boolean }>;
+}
+
 export async function getSwitchGame(ownerId: string, igdbId: number) {
   const [row] = await db
     .select({ id: switchGames.id, sizeMb: switchGames.sizeMb })
@@ -214,11 +225,14 @@ export async function listInstalled(ownerId: string) {
 }
 export type InstalledLite = Awaited<ReturnType<typeof listInstalled>>[number];
 
-// Jogos que outras IAs sugeriram (tela "Sugestões das IAs")
-export async function listAiSuggestions(ownerId: string) {
-  return db
+// O que outras IAs sugeriram (tela "Sugestões das IAs"), de um tipo
+export async function listAiSuggestions(ownerId: string, kind: Kind) {
+  const rows = await db
     .select({
+      kind: aiSuggestions.kind,
       igdbId: aiSuggestions.igdbId,
+      tmdbId: aiSuggestions.tmdbId,
+      reasons: aiSuggestions.reasons,
       title: aiSuggestions.title,
       year: aiSuggestions.year,
       coverUrl: aiSuggestions.coverUrl,
@@ -229,6 +243,8 @@ export async function listAiSuggestions(ownerId: string) {
       category: aiSuggestions.category,
     })
     .from(aiSuggestions)
-    .where(eq(aiSuggestions.ownerId, ownerId));
+    .where(and(eq(aiSuggestions.ownerId, ownerId), eq(aiSuggestions.kind, kind)));
+  // Chave única por tipo: IGDB nos jogos, TMDB em filmes e séries
+  return rows.map((r) => ({ ...r, ref: (kind === "game" ? r.igdbId : r.tmdbId)! }));
 }
 export type AiSuggestion = Awaited<ReturnType<typeof listAiSuggestions>>[number];

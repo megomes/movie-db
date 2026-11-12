@@ -96,6 +96,14 @@ export async function addItem(kind: string, externalId: string, tagIds: string[]
   return row.id;
 }
 
+// "Já vi / já joguei" de algo fora do backlog: entra direto como visto (vai para Vistos e some das sugestões)
+export async function addSeen(kind: string, externalId: string) {
+  const id = await addItem(kind, externalId);
+  await db.update(items).set({ doneAt: new Date() }).where(eq(items.id, id));
+  refresh();
+  return id;
+}
+
 // Link do IMDb compartilhado: descobre o tipo antes de perguntar as tags
 export async function resolveImdb(imdbId: string) {
   await requireUser();

@@ -15,7 +15,7 @@ import { KIND_ICONS } from "./kind-icon";
 
 // Pôster interativo: inclina com o mouse (desktop), mostra nota e revela infos no hover.
 // Com screenshots (jogos) ou cenas (filmes e séries): em vez de inclinar, o mouse passeia pelas imagens.
-// Jogo: botão direito abre o menu do jogo.
+// Botão direito abre o menu (backlog, prioridade, visto/zerado), menos em livros.
 export function Poster({
   item,
   morph = false,
@@ -39,7 +39,6 @@ export function Poster({
 }) {
   const { myProviders } = useBacklog();
   const openMenu = useGameMenu();
-  const game = item.kind === "game";
   const shots = item.shots ?? [];
   const [shot, setShot] = useState<number | null>(null);
   const preloaded = useRef(false);
@@ -58,7 +57,11 @@ export function Poster({
       href={href ?? `/item/${item.id}`}
       className="group relative block outline-none hover:z-10"
       aria-label={item.title}
-      onContextMenu={game ? (e) => openMenu(e, { igdbId: item.igdbId, title: item.title, coverUrl: item.coverUrl, itemId: item.id }) : undefined}
+      onContextMenu={
+        item.kind === "book"
+          ? undefined
+          : (e) => openMenu(e, { kind: item.kind as "game" | "movie" | "series", igdbId: item.igdbId, tmdbId: item.tmdbId, title: item.title, coverUrl: item.coverUrl, itemId: item.id })
+      }
       onPointerEnter={(e) => {
         if (e.pointerType !== "mouse" || !shots.length || preloaded.current) return;
         preloaded.current = true;

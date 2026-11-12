@@ -283,6 +283,16 @@ export function ListBrowser({
                 </Link>
               </>
             )}
+            {!readOnly && !home && (kind === "movie" || kind === "series") && (
+              <Link
+                href={`/sugestoes?k=${kind}`}
+                className="glass tap flex h-11 w-11 items-center justify-center rounded-full text-white/85 hover:text-white"
+                aria-label="Sugestões das IAs"
+                title="Sugestões das IAs"
+              >
+                <Sparkles size={18} />
+              </Link>
+            )}
             {sort === "shuffle" && (
               <button onClick={() => setSeed((s) => s + 1)} className="glass tap flex h-11 w-11 items-center justify-center rounded-full" aria-label="Embaralhar de novo">
                 <Shuffle size={17} />

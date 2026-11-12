@@ -99,6 +99,13 @@
       "when": 1794441625370,
       "tag": "0013_ai_suggestion_category",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1794443025361,
+      "tag": "0014_ai_suggestions_media",
+      "breakpoints": true
     }
   ]
 }

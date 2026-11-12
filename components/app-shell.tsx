@@ -198,9 +198,9 @@ function AvatarMenu() {
 
 const NAV: { href: string; kind?: string; label: string; icon: typeof House; match: (p: string, k: string | null) => boolean }[] = [
   { href: "/", label: "Início", icon: House, match: (p: string) => p === "/" },
-  { href: "/lista?k=movie", kind: "movie", label: "Filmes", icon: Clapperboard, match: (p: string, k: string | null) => p === "/lista" && k === "movie" },
-  { href: "/lista?k=series", kind: "series", label: "Séries", icon: Tv, match: (p: string, k: string | null) => p === "/lista" && k === "series" },
-  { href: "/lista?k=game", kind: "game", label: "Jogos", icon: Gamepad2, match: (p: string, k: string | null) => (p === "/lista" && k === "game") || p.startsWith("/switch") || p.startsWith("/jogo/") || p.startsWith("/descobrir") || p.startsWith("/sugestoes") },
+  { href: "/lista?k=movie", kind: "movie", label: "Filmes", icon: Clapperboard, match: (p: string, k: string | null) => (p === "/lista" || p === "/sugestoes") && k === "movie" },
+  { href: "/lista?k=series", kind: "series", label: "Séries", icon: Tv, match: (p: string, k: string | null) => (p === "/lista" || p === "/sugestoes") && k === "series" },
+  { href: "/lista?k=game", kind: "game", label: "Jogos", icon: Gamepad2, match: (p: string, k: string | null) => (p === "/lista" && k === "game") || p.startsWith("/switch") || p.startsWith("/jogo/") || p.startsWith("/descobrir") || (p === "/sugestoes" && (k == null || k === "game")) },
   { href: "/lista?k=book", kind: "book", label: "Livros", icon: BookOpen, match: (p: string, k: string | null) => p === "/lista" && k === "book" },
 ];
 

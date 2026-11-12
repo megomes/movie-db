@@ -4,16 +4,26 @@ import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { Download, ExternalLink, Eye, EyeOff, HardDrive, Heart, HeartOff, Loader2, Plus, Trash2, Trophy } from "lucide-react";
-import { addItem, deleteItem, markDone, setHiddenPlatforms, togglePin } from "@/app/actions";
+import { CircleCheckBig, Download, ExternalLink, Eye, EyeOff, HardDrive, Heart, HeartOff, Loader2, Plus, Trash2, Trophy } from "lucide-react";
+import { addItem, addSeen, deleteItem, markDone, setHiddenPlatforms, togglePin } from "@/app/actions";
 import { formatSize } from "@/lib/kinds";
 import { useBacklog } from "./backlog-context";
 import { Cover } from "./cover";
 import type { LiteItem } from "@/lib/queries";
 import { InstallDialog, Sheet, type InstallPlatform } from "./install-dialog";
 
-// Jogo alvo do menu: igdbId identifica no backlog e nos instalados; itemId ajuda quando já é um item do backlog
-export type MenuGame = { igdbId: number | null; title: string; coverUrl: string | null; itemId?: string | null; done?: boolean };
+// Alvo do menu: jogo (igdbId identifica no backlog e nos instalados) ou filme/série (tmdbId); itemId ajuda quando já é
+// um item do backlog. onSeen avisa a tela quando vira "já vi / já zerei" (ex.: as sugestões escondem na hora).
+export type MenuGame = {
+  kind?: "game" | "movie" | "series";
+  igdbId: number | null;
+  tmdbId?: number | null;
+  title: string;
+  coverUrl: string | null;
+  itemId?: string | null;
+  done?: boolean;
+  onSeen?: () => void;
+};
 
 const OpenMenu = createContext<(e: React.MouseEvent, game: MenuGame) => void>(() => {});
 
@@ -30,7 +40,7 @@ const VIEW_PLATFORMS = ["PC", "Switch"] as const;
 type ViewPlatform = (typeof VIEW_PLATFORMS)[number];
 const visibleOn = (i: LiteItem) => VIEW_PLATFORMS.filter((p) => i.platforms.includes(p) && !i.hiddenPlatforms.includes(p));
 
-// Menu de botão direito dos jogos (qualquer tela): backlog, prioridade, zerado, instalado no Switch/PC
+// Menu de botão direito (qualquer tela): backlog, prioridade, visto/zerado; nos jogos também instalado no Switch/PC
 export function GameMenuProvider({ children }: { children: React.ReactNode }) {
   const [menu, setMenu] = useState<{ x: number; y: number; game: MenuGame } | null>(null);
   const [install, setInstall] = useState<{ game: MenuGame & { igdbId: number }; platform: InstallPlatform } | null>(null);
@@ -104,9 +114,15 @@ function Menu({
   const [error, setError] = useState(false);
   const [, start] = useTransition();
 
+  const kind = game.kind ?? "game";
+  const isGame = kind === "game";
+  const target = isGame ? game.igdbId : (game.tmdbId ?? null);
   // Item do meu backlog (mesmo vindo da página de outra pessoa, vale o meu)
-  const item = items.find((i) => i.id === game.itemId) ?? (game.igdbId != null ? items.find((i) => i.kind === "game" && i.igdbId === game.igdbId) : undefined);
-  const mine = game.igdbId != null ? installed.filter((r) => r.igdbId === game.igdbId) : [];
+  const item =
+    items.find((i) => i.id === game.itemId) ??
+    (target != null ? items.find((i) => i.kind === kind && (isGame ? i.igdbId : i.tmdbId) === target) : undefined);
+  const mine = isGame && game.igdbId != null ? installed.filter((r) => r.igdbId === game.igdbId) : [];
+  const seenLabel = isGame ? "Já joguei" : "Já vi";
 
   // Cabe na tela: abre para o outro lado perto das bordas
   useLayoutEffect(() => {
@@ -170,7 +186,7 @@ function Menu({
     >
       <div className="flex items-center gap-2.5 px-2 pb-2 pt-1.5">
         <div className="w-8 shrink-0">
-          <Cover item={{ id: String(game.igdbId ?? game.itemId ?? game.title), title: game.title, kind: "game", coverUrl: game.coverUrl }} rounded="rounded-md" />
+          <Cover item={{ id: String(target ?? game.itemId ?? game.title), title: game.title, kind, coverUrl: game.coverUrl }} rounded="rounded-md" />
         </div>
         <p className="min-w-0 flex-1 text-[13px] font-semibold leading-snug line-clamp-2">{game.title}</p>
       </div>
@@ -185,17 +201,42 @@ function Menu({
             label={item.pinned ? "Tirar da prioridade" : "Priorizar (Quero muito)"}
             onClick={() => fast(item.id, { pinned: !item.pinned }, () => togglePin(item.id))}
           />
-          <Row busy={busy} id="done" icon={<Trophy size={15} />} label="Marcar como zerado" onClick={() => fast(item.id, null, () => markDone(item.id))} />
+          <Row
+            busy={busy}
+            id="done"
+            icon={isGame ? <Trophy size={15} /> : <CircleCheckBig size={15} />}
+            label={isGame ? "Marcar como zerado" : "Já vi"}
+            onClick={() => {
+              game.onSeen?.();
+              fast(item.id, null, () => markDone(item.id));
+            }}
+          />
         </>
       ) : game.done ? (
         <p className="flex items-center gap-2.5 px-2.5 py-2 text-[13.5px] text-text-3">
-          <Trophy size={15} /> Já zerado
+          {isGame ? <Trophy size={15} /> : <CircleCheckBig size={15} />} {isGame ? "Já zerado" : "Já visto"}
         </p>
       ) : (
-        game.igdbId != null && <Row busy={busy} id="add" icon={<Plus size={16} />} label="Pôr no backlog" onClick={() => run("add", () => addItem("game", String(game.igdbId)))} />
+        target != null && (
+          <>
+            <Row busy={busy} id="add" icon={<Plus size={16} />} label="Pôr no backlog" onClick={() => run("add", () => addItem(kind, String(target)))} />
+            {/* Fora do backlog: entra direto como visto (vai para Vistos) */}
+            <Row
+              busy={busy}
+              id="seen"
+              icon={isGame ? <Trophy size={15} /> : <CircleCheckBig size={15} />}
+              label={seenLabel}
+              onClick={() => {
+                game.onSeen?.();
+                onClose();
+                addSeen(kind, String(target)).catch(() => {});
+              }}
+            />
+          </>
+        )
       )}
 
-      {game.igdbId != null && (
+      {isGame && game.igdbId != null && (
         <>
           <Sep />
           {PLATFORMS.map((p) => {
@@ -216,7 +257,7 @@ function Menu({
       )}
 
       {/* Esconder do PC/Switch: some daquele filtro, fica só no outro */}
-      {item && VIEW_PLATFORMS.some((p) => item.platforms.includes(p)) && (
+      {isGame && item && VIEW_PLATFORMS.some((p) => item.platforms.includes(p)) && (
         <>
           <Sep />
           {VIEW_PLATFORMS.filter((p) => item.platforms.includes(p)).map((p) => {
@@ -248,7 +289,10 @@ function Menu({
         label="Abrir página"
         onClick={() => {
           onClose();
-          router.push(item ? `/item/${item.id}` : game.itemId ? `/item/${game.itemId}` : `/jogo/${game.igdbId}`);
+          if (item || game.itemId) return router.push(`/item/${item?.id ?? game.itemId}`);
+          if (isGame) return router.push(`/jogo/${game.igdbId}`);
+          // Filme/série fora do backlog ainda não tem página no app: abre no TMDB
+          window.open(`https://www.themoviedb.org/${kind === "movie" ? "movie" : "tv"}/${target}`, "_blank", "noopener");
         }}
       />
       {item && <Row busy={busy} id="remove" danger icon={<Trash2 size={15} />} label="Tirar do backlog" onClick={() => fast(item.id, null, () => deleteItem(item.id))} />}

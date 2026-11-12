@@ -182,13 +182,16 @@ export const switchGames = pgTable(
 
 export type SwitchGame = typeof switchGames.$inferSelect;
 
-// Jogos sugeridos por outras IAs (a partir do backlog exportado), com quais IAs sugeriram cada um
+// Jogos, filmes e séries sugeridos por outras IAs (a partir do backlog exportado), com quais IAs sugeriram cada um
 export const aiSuggestions = pgTable(
   "ai_suggestions",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     ownerId: text("owner_id").notNull(),
-    igdbId: integer("igdb_id").notNull(),
+    kind: kindEnum("kind").notNull().default("game"),
+    // Jogo: IGDB; filme/série: TMDB
+    igdbId: integer("igdb_id"),
+    tmdbId: integer("tmdb_id"),
     title: text("title").notNull(),
     year: integer("year"),
     coverUrl: text("cover_url"),
@@ -199,9 +202,14 @@ export const aiSuggestions = pgTable(
     sources: text("sources").array().notNull().default([]),
     // Categoria normalizada (lib/ai-picks.ts): a que mais IAs usaram para esse jogo
     category: text("category"),
+    // Por que cada IA sugeriu, em poucas palavras: { Claude: "...", Grok: "..." }
+    reasons: jsonb("reasons").$type<Record<string, string>>().notNull().default({}),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [uniqueIndex("ai_suggestions_owner_igdb").on(t.ownerId, t.igdbId)],
+  (t) => [
+    uniqueIndex("ai_suggestions_owner_igdb").on(t.ownerId, t.igdbId),
+    uniqueIndex("ai_suggestions_owner_tmdb").on(t.ownerId, t.kind, t.tmdbId),
+  ],
 );
 
 export const profiles = pgTable("profiles", {

@@ -7,9 +7,10 @@ import { addItem, deleteItem } from "@/app/actions";
 import { useBacklog } from "./backlog-context";
 import { Cover } from "./cover";
 
-// Capa de jogo que, com o mouse em cima, percorre as screenshots pela posição horizontal
+// Capa (jogo, filme ou série) que, com o mouse em cima, percorre as screenshots/cenas pela posição horizontal
 export function ShotCover({
   id,
+  kind = "game",
   title,
   coverUrl,
   screenshots,
@@ -18,6 +19,7 @@ export function ShotCover({
   overlay,
 }: {
   id: string;
+  kind?: "game" | "movie" | "series";
   title: string;
   coverUrl: string | null;
   screenshots: string[];
@@ -46,7 +48,7 @@ export function ShotCover({
       onPointerLeave={() => setShot(null)}
     >
       <Cover
-        item={{ id, title, kind: "game", coverUrl }}
+        item={{ id, title, kind, coverUrl }}
         eager={eager}
         rounded="rounded-2xl"
         className={dim && shot == null ? "opacity-80 transition-opacity group-hover:opacity-100" : ""}
@@ -87,9 +89,9 @@ export function BacklogButton({ on, busy, onClick }: { on: boolean; busy: boolea
 
 export type BacklogRef = { id: string; done: boolean };
 
-// Estado "está no backlog?" por jogo do IGDB, com pôr/tirar otimista. A base é o backlog do app (que o menu de
+// Estado "está no backlog?" por jogo do IGDB (ou filme/série do TMDB), com pôr/tirar otimista. A base é o backlog do app (que o menu de
 // botão direito também muda) mais os zerados que a página mandou; as mudanças locais valem até o backlog atualizar.
-export function useBacklogToggle(initial: Record<number, BacklogRef>) {
+export function useBacklogToggle(initial: Record<number, BacklogRef>, kind: "game" | "movie" | "series" = "game") {
   const { items } = useBacklog();
   const [overrides, setOverrides] = useState<Record<number, BacklogRef | null>>({});
   const [lastItems, setLastItems] = useState(items);
@@ -100,13 +102,16 @@ export function useBacklogToggle(initial: Record<number, BacklogRef>) {
   const owned = useMemo(() => {
     const o: Record<number, BacklogRef> = {};
     for (const [k, v] of Object.entries(initial)) if (v.done) o[Number(k)] = v;
-    for (const i of items) if (i.kind === "game" && i.igdbId != null) o[i.igdbId] = { id: i.id, done: false };
+    for (const i of items) {
+      const ref = kind === "game" ? i.igdbId : i.tmdbId;
+      if (i.kind === kind && ref != null) o[ref] = { id: i.id, done: false };
+    }
     for (const [k, v] of Object.entries(overrides)) {
       if (v) o[Number(k)] = v;
       else delete o[Number(k)];
     }
     return o;
-  }, [initial, items, overrides]);
+  }, [initial, items, overrides, kind]);
   const [busy, setBusy] = useState<Set<number>>(new Set());
   const [, startTransition] = useTransition();
 
@@ -129,7 +134,7 @@ export function useBacklogToggle(initial: Record<number, BacklogRef>) {
           set(igdbId, null);
           await deleteItem(prev.id);
         } else {
-          const id = await addItem("game", String(igdbId));
+          const id = await addItem(kind, String(igdbId));
           set(igdbId, { id, done: false });
         }
       } catch {
