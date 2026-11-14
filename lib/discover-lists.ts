@@ -17,9 +17,7 @@ export const LISTS = [
   { id: "wanted", label: "Mais desejados", short: "Desejados", hint: "Os que mais gente marcou como “quero jogar”", mc: false },
   { id: "new", label: "Lançamentos recentes", short: "Lançamentos", hint: "Lançados nos últimos 90 dias, os mais avaliados primeiro", mc: false },
   { id: "soon", label: "Em breve", short: "Em breve", hint: "Ainda não lançados, os mais aguardados primeiro", mc: false },
-  { id: "mc-top", label: "Metacritic: melhores", short: "Metacritic", hint: "Até 100 jogos com maior Metascore (nota da crítica) de todos os tempos, sem DLCs", mc: true },
-  { id: "mc-year", label: "Metacritic por ano", short: "MC por ano", hint: "Os 50 com maior Metascore de cada um dos últimos 5 anos", mc: true },
-  { id: "mc-users", label: "Metacritic: jogadores", short: "MC jogadores", hint: "Até 100 jogos com maior nota dos jogadores no Metacritic, sem DLCs", mc: true },
+  { id: "mc", label: "Metacritic", short: "Metacritic", hint: "Listas do Metacritic (guardadas no app), com os dados do IGDB", mc: true },
 ] as const;
 export type ListId = (typeof LISTS)[number]["id"];
 export const isListId = (v: unknown): v is ListId => LISTS.some((l) => l.id === v);

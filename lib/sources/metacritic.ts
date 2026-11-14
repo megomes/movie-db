@@ -32,14 +32,30 @@ function parse(html: string): MetacriticRow[] {
   return out;
 }
 
-/** Uma lista do Metacritic, ex.: path "pc/all/all-time/metascore" (50 por página) */
-export async function getMetacriticList(path: string, pages = 1): Promise<MetacriticRow[]> {
+export const metacriticUrl = (path: string, query = "", page = 1) => {
+  const q = new URLSearchParams(query);
+  if (page > 1) q.set("page", String(page));
+  const qs = q.toString();
+  return `${BASE}/${path}/${qs ? `?${qs}` : ""}`;
+};
+
+/** Uma página de lista do Metacritic (50 jogos) e o total de resultados do filtro */
+export async function getMetacriticPage(path: string, query = "", page = 1): Promise<{ rows: MetacriticRow[]; total: number }> {
+  const res = await fetch(metacriticUrl(path, query, page), { headers: { "User-Agent": UA, Accept: "text/html" } });
+  if (!res.ok) throw new Error(`Metacritic ${res.status} em ${path}?${query}`);
+  const html = await res.text();
+  const total = Number(html.match(/([\d,]+) results/)?.[1]?.replace(/,/g, "") ?? 0);
+  return { rows: parse(html), total };
+}
+
+/** Várias páginas seguidas, com pausa entre elas */
+export async function getMetacriticList(path: string, query = "", pages = 1): Promise<MetacriticRow[]> {
   const rows: MetacriticRow[] = [];
   for (let page = 1; page <= pages; page++) {
-    if (page > 1) await sleep(800);
-    const res = await fetch(`${BASE}/${path}/${page > 1 ? `?page=${page}` : ""}`, { headers: { "User-Agent": UA, Accept: "text/html" } });
-    if (!res.ok) throw new Error(`Metacritic ${res.status} em ${path}`);
-    rows.push(...parse(await res.text()));
+    if (page > 1) await sleep(900);
+    const { rows: r, total } = await getMetacriticPage(path, query, page);
+    rows.push(...r);
+    if (rows.length >= total) break;
   }
   return rows;
 }

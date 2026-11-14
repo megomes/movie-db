@@ -20,12 +20,15 @@ export function DiscoverView({
   groups,
   backlog,
   installed: installedIds,
+  mc,
 }: {
   platform: PlatformId;
   list: ListId;
   groups: DiscoverGroup[];
   backlog: Record<number, BacklogRef>;
   installed: number[];
+  /** Listas do Metacritic guardadas (só quando list = "mc") e a escolhida */
+  mc?: { lists: { slug: string; label: string; group: string }[]; selected: string | null; url: string | null };
 }) {
   const { owned, busy, toggle } = useBacklogToggle(backlog);
   const menuProps = useMenuTrigger();
@@ -33,7 +36,9 @@ export function DiscoverView({
   const sp = useSearchParams();
   // Fica na URL (e passa entre listas/plataformas): voltar de um jogo reabre do mesmo jeito
   const [hideMine, setHideMine] = useState(sp.get("esconder") === "1");
-  const href = (p: PlatformId, l: ListId) => `/descobrir?plataforma=${p}&lista=${l}${hideMine ? "&esconder=1" : ""}`;
+  const href = (p: PlatformId, l: ListId, m?: string | null) =>
+    `/descobrir?plataforma=${p}&lista=${l}${l === "mc" && m ? `&mc=${encodeURIComponent(m)}` : ""}${hideMine ? "&esconder=1" : ""}`;
+  const mcSelected = mc?.lists.find((l) => l.slug === mc.selected);
   function toggleHide() {
     const next = !hideMine;
     setHideMine(next);
@@ -65,7 +70,7 @@ export function DiscoverView({
               <Link
                 key={p.id}
                 // Sem a lista no Metacritic (Android): cai em "Melhores"
-                href={href(p.id, listsFor(p.id).some((l) => l.id === list) ? list : "top")}
+                href={href(p.id, listsFor(p.id).some((l) => l.id === list) ? list : "top", mc?.selected)}
                 scroll={false}
                 aria-current={platform === p.id ? "page" : undefined}
                 className={`tap rounded-full px-4 py-2 text-[14px] font-semibold transition-colors ${platform === p.id ? "bg-white text-black" : "text-white/70 hover:text-white"}`}
@@ -76,7 +81,24 @@ export function DiscoverView({
           </nav>
         </div>
         <p className="mt-2 text-[15px] text-text-2">
-          {meta.label} no {platformOf(platform).label} · <span className="text-text-3">{meta.hint}</span>
+          {meta.label} no {platformOf(platform).label}
+          {mcSelected ? (
+            <>
+              {" "}· <span className="text-white/85">{mcSelected.group === "ano" ? `Melhores de ${mcSelected.label}` : mcSelected.label}</span>
+              {mc?.url && (
+                <>
+                  {" "}·{" "}
+                  <a href={mc.url} target="_blank" rel="noopener noreferrer" className="text-text-3 underline-offset-2 hover:text-white hover:underline">
+                    ver no Metacritic
+                  </a>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              {" "}· <span className="text-text-3">{meta.hint}</span>
+            </>
+          )}
         </p>
       </header>
 
@@ -98,6 +120,35 @@ export function DiscoverView({
             Esconder o que já tenho
           </button>
         </div>
+        {/* Metacritic: as listas guardadas, por grupo (geral, por ano, por gênero) */}
+        {mc && mc.lists.length > 0 && (
+          <nav aria-label="Listas do Metacritic" className="glass no-scrollbar flex max-w-full items-center gap-1 overflow-x-auto rounded-full p-1">
+            {(["geral", "ano", "genero"] as const).map((g) => {
+              const items = mc.lists.filter((l) => l.group === g);
+              if (!items.length) return null;
+              return (
+                <div key={g} className="flex shrink-0 items-center gap-1">
+                  {g !== "geral" && (
+                    <span className="shrink-0 pl-2 pr-1 text-[11px] font-semibold uppercase tracking-wide text-text-3">{g === "ano" ? "Ano" : "Gênero"}</span>
+                  )}
+                  {items.map((l) => (
+                    <Link
+                      key={l.slug}
+                      href={href(platform, "mc", l.slug)}
+                      scroll={false}
+                      aria-current={mc.selected === l.slug ? "page" : undefined}
+                      className={`shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
+                        mc.selected === l.slug ? "bg-white text-black" : "text-white/70 hover:text-white"
+                      }`}
+                    >
+                      {l.label}
+                    </Link>
+                  ))}
+                </div>
+              );
+            })}
+          </nav>
+        )}
       </div>
 
       <div className="space-y-12 pt-3">

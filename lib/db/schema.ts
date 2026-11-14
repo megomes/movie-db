@@ -182,6 +182,24 @@ export const switchGames = pgTable(
 
 export type SwitchGame = typeof switchGames.$inferSelect;
 
+// Listas do Metacritic guardadas (scripts/metacritic-sync.ts): só posição, nome, nota e o jogo do IGDB correspondente.
+// O Descobrir lê daqui e busca capa/screenshots no IGDB pelos ids, sem ir ao Metacritic na hora.
+export type MetacriticEntry = { rank: number; title: string; year: number | null; score: string; igdbId: number | null };
+export const metacriticLists = pgTable("metacritic_lists", {
+  // Ex.: "pc/top", "switch/ano-2025", "pc/genero-roguelike"
+  id: text("id").primaryKey(),
+  // "pc" ou "switch" (as plataformas do Descobrir)
+  platform: text("platform").notNull(),
+  // "geral", "ano" ou "genero"
+  group: text("group").notNull(),
+  label: text("label").notNull(),
+  position: integer("position").notNull().default(0),
+  // Página de origem no Metacritic
+  url: text("url").notNull(),
+  entries: jsonb("entries").$type<MetacriticEntry[]>().notNull().default([]),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Jogos, filmes e séries sugeridos por outras IAs (a partir do backlog exportado), com quais IAs sugeriram cada um
 export const aiSuggestions = pgTable(
   "ai_suggestions",
