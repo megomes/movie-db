@@ -35,28 +35,31 @@ const START_MS = 200;
 
 /**
  * Segurar o dedo na capa (celular) passa as screenshots sozinho, uma a cada X ms (do Perfil), até soltar.
- * Toque rápido continua abrindo o card; mexer o dedo antes de começar (rolar a tela) cancela.
+ * Toque rápido continua abrindo o card; arrastar o dedo (rolar a tela), antes ou durante, para tudo.
+ * O fim do toque e a rolagem são ouvidos na janela: rolando, o navegador pode nem mandar o touchend para o card.
  */
 export function useHoldScrub(shots: string[], setShot: (i: number | null) => void) {
-  const st = useRef<{ start: number; tick: number; x: number; y: number; on: boolean } | null>(null);
+  const st = useRef<{ start: number; tick: number; x: number; y: number; on: boolean; off: () => void } | null>(null);
   const preloaded = useRef(false);
   const latest = useRef({ shots, setShot });
   useEffect(() => {
     latest.current = { shots, setShot };
   });
 
-  const stop = useCallback(() => {
+  // released: soltou o dedo parado (aí engole o clique que viria); arrastou/rolou: só para
+  const stop = useCallback((released = false) => {
     const s = st.current;
     if (!s) return;
     clearTimeout(s.start);
     clearInterval(s.tick);
+    s.off();
     st.current = null;
     if (s.on) {
       latest.current.setShot(null);
-      swallowNextClick();
+      if (released) swallowNextClick();
     }
   }, []);
-  useEffect(() => stop, [stop]);
+  useEffect(() => () => stop(), [stop]);
 
   if (!shots.length) return {};
   return {
@@ -68,7 +71,30 @@ export function useHoldScrub(shots: string[], setShot: (i: number | null) => voi
         for (const src of shots) new Image().src = src;
       }
       const t = e.touches[0];
-      const s = { start: 0, tick: 0, x: t.clientX, y: t.clientY, on: false };
+      const release = () => stop(true);
+      const cancel = () => stop();
+      const move = (ev: TouchEvent) => {
+        const p = ev.touches[0];
+        if (!p || Math.hypot(p.clientX - s.x, p.clientY - s.y) > 10) stop();
+      };
+      const opts = { capture: true, passive: true } as const;
+      window.addEventListener("touchend", release, opts);
+      window.addEventListener("touchcancel", cancel, opts);
+      window.addEventListener("touchmove", move, opts);
+      window.addEventListener("scroll", cancel, opts);
+      const s = {
+        start: 0,
+        tick: 0,
+        x: t.clientX,
+        y: t.clientY,
+        on: false,
+        off: () => {
+          window.removeEventListener("touchend", release, opts);
+          window.removeEventListener("touchcancel", cancel, opts);
+          window.removeEventListener("touchmove", move, opts);
+          window.removeEventListener("scroll", cancel, opts);
+        },
+      };
       s.start = window.setTimeout(() => {
         s.on = true;
         let i = 0;
@@ -81,12 +107,5 @@ export function useHoldScrub(shots: string[], setShot: (i: number | null) => voi
       }, START_MS);
       st.current = s;
     },
-    onTouchMove: (e: React.TouchEvent) => {
-      const s = st.current;
-      const t = e.touches[0];
-      if (s && !s.on && Math.hypot(t.clientX - s.x, t.clientY - s.y) > 10) stop();
-    },
-    onTouchEnd: stop,
-    onTouchCancel: stop,
   };
 }
