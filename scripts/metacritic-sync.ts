@@ -47,7 +47,7 @@ const GENRES: [slug: string, label: string][] = [
   ["arcade", "Arcade"],
 ];
 const MIN_GENRE = 15;
-const FIRST_YEAR = 2017;
+const FIRST_YEAR = 2022;
 
 type ListDef = { id: string; platform: string; group: string; label: string; position: number; path: string; query: string; pages: number };
 
