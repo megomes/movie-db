@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useMemo, useState, useTransition } from "react";
 import { motion } from "motion/react";
 import { ArrowLeft, Gamepad2 } from "lucide-react";
 import { LISTS, listsFor, platformOf, PLATFORMS, type DiscoverGroup, type ListId, type PlatformId } from "@/lib/discover-lists";
 import { ptGenre } from "@/lib/genres";
+import { DiscoverGridSkeleton } from "./discover-skeleton";
 import { GUTTER } from "./rail";
 import { HOLD_CLASS, useMenuTrigger } from "./game-menu";
 import { BacklogButton, ShotCover, useBacklogToggle, type BacklogRef } from "./shot-cover";
@@ -39,6 +40,21 @@ export function DiscoverView({
   const href = (p: PlatformId, l: ListId, m?: string | null) =>
     `/descobrir?plataforma=${p}&lista=${l}${l === "mc" && m ? `&mc=${encodeURIComponent(m)}` : ""}${hideMine ? "&esconder=1" : ""}`;
   const mcSelected = mc?.lists.find((l) => l.slug === mc.selected);
+
+  // Troca de plataforma/lista: o botão muda na hora e a grade vira esqueleto até a nova lista chegar do servidor
+  const router = useRouter();
+  const [loading, startNav] = useTransition();
+  const [target, setTarget] = useState<{ p: PlatformId; l: ListId; m: string | null } | null>(null);
+  const shownPlatform = target?.p ?? platform;
+  const shownList = target?.l ?? list;
+  const shownMc = target ? target.m : (mc?.selected ?? null);
+  function go(e: React.MouseEvent, p: PlatformId, l: ListId, m: string | null = null) {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; // nova aba etc.: deixa o link
+    e.preventDefault();
+    if (p === shownPlatform && l === shownList && (l !== "mc" || m === shownMc)) return;
+    setTarget({ p, l, m });
+    startNav(() => router.push(href(p, l, m), { scroll: false }));
+  }
   function toggleHide() {
     const next = !hideMine;
     setHideMine(next);
@@ -66,18 +82,22 @@ export function DiscoverView({
         <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
           <h1 className="text-[34px] font-bold leading-none tracking-tight lg:text-[52px]">Descobrir</h1>
           <nav aria-label="Plataforma" className="glass inline-flex gap-1 rounded-full p-1">
-            {PLATFORMS.map((p) => (
-              <Link
-                key={p.id}
-                // Sem a lista no Metacritic (Android): cai em "Melhores"
-                href={href(p.id, listsFor(p.id).some((l) => l.id === list) ? list : "top", mc?.selected)}
-                scroll={false}
-                aria-current={platform === p.id ? "page" : undefined}
-                className={`tap rounded-full px-4 py-2 text-[14px] font-semibold transition-colors ${platform === p.id ? "bg-white text-black" : "text-white/70 hover:text-white"}`}
-              >
-                {p.label}
-              </Link>
-            ))}
+            {PLATFORMS.map((p) => {
+              // Sem a lista no Metacritic (Android): cai em "Melhores"
+              const l = listsFor(p.id).some((x) => x.id === shownList) ? shownList : "top";
+              return (
+                <Link
+                  key={p.id}
+                  href={href(p.id, l, shownMc)}
+                  onClick={(e) => go(e, p.id, l, shownMc)}
+                  scroll={false}
+                  aria-current={shownPlatform === p.id ? "page" : undefined}
+                  className={`tap rounded-full px-4 py-2 text-[14px] font-semibold transition-colors ${shownPlatform === p.id ? "bg-white text-black" : "text-white/70 hover:text-white"}`}
+                >
+                  {p.label}
+                </Link>
+              );
+            })}
           </nav>
         </div>
         <p className="mt-2 text-[15px] text-text-2">
@@ -105,10 +125,16 @@ export function DiscoverView({
       <div className={`sticky top-0 z-30 mt-4 space-y-2.5 py-3 lg:top-20 ${GUTTER}`}>
         <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
           <nav className="glass no-scrollbar inline-flex max-w-full gap-1 overflow-x-auto rounded-full p-1">
-            {listsFor(platform).map((l) => (
-              <Link key={l.id} href={href(platform, l.id)} scroll={false} className="relative shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium">
-                {list === l.id && <motion.span layoutId="discover-list" className="btn-accent absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
-                <span className={`relative ${list === l.id ? "text-white" : "text-white/70"}`}>{l.short}</span>
+            {listsFor(shownPlatform).map((l) => (
+              <Link
+                key={l.id}
+                href={href(shownPlatform, l.id)}
+                onClick={(e) => go(e, shownPlatform, l.id)}
+                scroll={false}
+                className="relative shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium"
+              >
+                {shownList === l.id && <motion.span layoutId="discover-list" className="btn-accent absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
+                <span className={`relative ${shownList === l.id ? "text-white" : "text-white/70"}`}>{l.short}</span>
               </Link>
             ))}
           </nav>
@@ -121,7 +147,7 @@ export function DiscoverView({
           </button>
         </div>
         {/* Metacritic: as listas guardadas, por grupo (geral, por ano, por gênero) */}
-        {mc && mc.lists.length > 0 && (
+        {mc && mc.lists.length > 0 && shownList === "mc" && shownPlatform === platform && (
           <nav aria-label="Listas do Metacritic" className="glass no-scrollbar flex max-w-full items-center gap-1 overflow-x-auto rounded-full p-1">
             {(["geral", "ano", "genero"] as const).map((g) => {
               const items = mc.lists.filter((l) => l.group === g);
@@ -135,10 +161,11 @@ export function DiscoverView({
                     <Link
                       key={l.slug}
                       href={href(platform, "mc", l.slug)}
+                      onClick={(e) => go(e, platform, "mc", l.slug)}
                       scroll={false}
-                      aria-current={mc.selected === l.slug ? "page" : undefined}
+                      aria-current={shownMc === l.slug ? "page" : undefined}
                       className={`shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
-                        mc.selected === l.slug ? "bg-white text-black" : "text-white/70 hover:text-white"
+                        shownMc === l.slug ? "bg-white text-black" : "text-white/70 hover:text-white"
                       }`}
                     >
                       {l.label}
@@ -151,7 +178,8 @@ export function DiscoverView({
         )}
       </div>
 
-      <div className="space-y-12 pt-3">
+      {loading && <DiscoverGridSkeleton className="pt-3" />}
+      <div className={`space-y-12 pt-3 ${loading ? "hidden" : ""}`}>
         {sections.map((s) => (
           <section key={s.id}>
             {s.title && (
@@ -215,7 +243,7 @@ export function DiscoverView({
           </section>
         ))}
       </div>
-      {!sections.length && <p className="px-4 py-24 text-center text-text-2">{total ? "Você já tem todos desta lista!" : "Não deu pra carregar esta lista agora."}</p>}
+      {!loading && !sections.length && <p className="px-4 py-24 text-center text-text-2">{total ? "Você já tem todos desta lista!" : "Não deu pra carregar esta lista agora."}</p>}
     </div>
   );
 }
