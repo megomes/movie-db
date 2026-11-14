@@ -11,7 +11,7 @@ import { eq } from "drizzle-orm";
 import { db, metacriticLists, type MetacriticEntry } from "../lib/db";
 import { igdb } from "../lib/sources/igdb";
 import { normalize, sleep } from "../lib/sources/http";
-import { getMetacriticList, getMetacriticPage, metacriticUrl, type MetacriticRow } from "../lib/sources/metacritic";
+import { getMetacriticPage, metacriticUrl, type MetacriticRow } from "../lib/sources/metacritic";
 
 const arg = (name: string) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
 const ONLY = arg("only");
@@ -23,7 +23,8 @@ const PLATFORMS = [
 ] as const;
 
 // Gêneros do filtro do Metacritic (o "-" do nome vira "---" e a "/" vira "-or-"). Vários grandes (Platformer, Fighting,
-// Shooter, FPS, Tactics...) não devolvem nada lá; só entra o gênero que tiver pelo menos MIN_GENRE jogos na plataforma.
+// Shooter, FPS, Tactics...) não devolvem nada lá; só entra o gênero que tiver pelo menos MIN_GENRE jogos na plataforma
+// (contando todos os anos). O que a lista mostra é só de FIRST_YEAR para cá.
 const GENRES: [slug: string, label: string][] = [
   ["action-rpg", "RPG de ação"],
   ["rpg", "RPG"],
@@ -49,7 +50,9 @@ const GENRES: [slug: string, label: string][] = [
 const MIN_GENRE = 15;
 const FIRST_YEAR = 2022;
 
-type ListDef = { id: string; platform: string; group: string; label: string; position: number; path: string; query: string; pages: number };
+// want: quantos jogos achados no IGDB a lista deve ter (busca mais páginas até chegar lá ou acabar, no máximo MAX_PAGES)
+type ListDef = { id: string; platform: string; group: string; label: string; position: number; path: string; query: string; want: number };
+const MAX_PAGES = 8;
 
 // Nome do Metacritic -> id do IGDB. Primeiro por nome exato (sem diferenciar maiúsculas), 25 por consulta; quem não bater
 // vai pela busca do IGDB. Com mais de um jogo do mesmo nome (remakes), fica o da plataforma e do ano certos.
@@ -96,34 +99,45 @@ async function main() {
   for (const l of await db.select().from(metacriticLists)) for (const e of l.entries) known.set(keyOf(l.platform, e), e.igdbId);
 
   const year = new Date().getUTCFullYear();
+  // "Melhores" e gêneros: só jogos lançados de FIRST_YEAR para cá
+  const since = `releaseYearMin=${FIRST_YEAR}&releaseYearMax=${year}`;
   for (const p of PLATFORMS.filter((x) => !ONLY || x.id === ONLY)) {
     const defs: ListDef[] = [
-      { id: `${p.id}/top`, platform: p.id, group: "geral", label: "Melhores de sempre", position: 0, path: `${p.mc}/all/all-time/metascore`, query: "", pages: 2 },
-      { id: `${p.id}/jogadores`, platform: p.id, group: "geral", label: "Nota dos jogadores", position: 1, path: `${p.mc}/all/all-time/userscore`, query: "", pages: 2 },
+      { id: `${p.id}/top`, platform: p.id, group: "geral", label: `Melhores desde ${FIRST_YEAR}`, position: 0, path: `${p.mc}/all/all-time/metascore`, query: since, want: 100 },
+      { id: `${p.id}/jogadores`, platform: p.id, group: "geral", label: `Jogadores desde ${FIRST_YEAR}`, position: 1, path: `${p.mc}/all/all-time/userscore`, query: since, want: 100 },
     ];
     for (let y = year; y >= FIRST_YEAR; y--) {
-      defs.push({ id: `${p.id}/ano-${y}`, platform: p.id, group: "ano", label: String(y), position: 100 + (year - y), path: `${p.mc}/all/${y}/metascore`, query: "", pages: 1 });
+      defs.push({ id: `${p.id}/ano-${y}`, platform: p.id, group: "ano", label: String(y), position: 100 + (year - y), path: `${p.mc}/all/${y}/metascore`, query: "", want: 50 });
     }
     // Gênero só se tiver jogos suficientes nesta plataforma
     for (const [i, [slug, label]] of GENRES.entries()) {
+      // O gênero entra pelo tamanho de sempre (mantém as mesmas listas); o conteúdo é só de FIRST_YEAR para cá
       const { total } = await getMetacriticPage(`${p.mc}/all/all-time/metascore`, `genre=${slug}`);
       await sleep(900);
       if (total < MIN_GENRE) {
         console.log(`  ${p.id} · ${label}: ${total} jogos, fica de fora`);
         continue;
       }
-      defs.push({ id: `${p.id}/genero-${slug}`, platform: p.id, group: "genero", label, position: 200 + i, path: `${p.mc}/all/all-time/metascore`, query: `genre=${slug}`, pages: 1 });
+      defs.push({ id: `${p.id}/genero-${slug}`, platform: p.id, group: "genero", label, position: 200 + i, path: `${p.mc}/all/all-time/metascore`, query: `genre=${slug}&${since}`, want: 50 });
     }
 
     for (const d of defs) {
-      const rows = await getMetacriticList(d.path, d.query, d.pages);
-      await sleep(900);
-      const todo = rows.filter((r) => !known.has(keyOf(p.id, r)));
-      const ids = todo.length ? await matchIds(todo, p.igdb) : [];
-      todo.forEach((r, i) => known.set(keyOf(p.id, r), ids[i]));
-      const entries: MetacriticEntry[] = rows.map((r) => ({ ...r, igdbId: known.get(keyOf(p.id, r)) ?? null }));
+      // Página a página até ter `want` jogos achados no IGDB (DLCs e nomes sem par ficam de fora)
+      const entries: MetacriticEntry[] = [];
+      let searched = 0;
+      for (let page = 1; page <= MAX_PAGES; page++) {
+        const { rows, total } = await getMetacriticPage(d.path, d.query, page);
+        await sleep(900);
+        const todo = rows.filter((r) => !known.has(keyOf(p.id, r)));
+        const ids = todo.length ? await matchIds(todo, p.igdb) : [];
+        todo.forEach((r, i) => known.set(keyOf(p.id, r), ids[i]));
+        searched += todo.length;
+        entries.push(...rows.map((r) => ({ ...r, igdbId: known.get(keyOf(p.id, r)) ?? null })));
+        if (entries.filter((e) => e.igdbId != null).length >= d.want || entries.length >= total || !rows.length) break;
+      }
+      const rows = entries;
       const hit = entries.filter((e) => e.igdbId != null).length;
-      console.log(`${d.id}: ${rows.length} no Metacritic, ${hit} no IGDB (${todo.length} procurados agora)`);
+      console.log(`${d.id}: ${rows.length} no Metacritic, ${hit} no IGDB (${searched} procurados agora)`);
       if (DRY || !rows.length) continue;
       const values = { platform: d.platform, group: d.group, label: d.label, position: d.position, url: metacriticUrl(d.path, d.query), entries, updatedAt: new Date() };
       await db.insert(metacriticLists).values({ id: d.id, ...values }).onConflictDoUpdate({ target: metacriticLists.id, set: values });
