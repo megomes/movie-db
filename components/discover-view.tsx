@@ -85,7 +85,7 @@ export function DiscoverView({
           {mcSelected ? (
             <>
               {" "}· <span className="text-white/85">{mcSelected.group === "ano" ? `Melhores de ${mcSelected.label}` : mcSelected.label}</span>
-              {mc?.url && (
+              {mc?.url && mcSelected.group !== "genero" && (
                 <>
                   {" "}·{" "}
                   <a href={mc.url} target="_blank" rel="noopener noreferrer" className="text-text-3 underline-offset-2 hover:text-white hover:underline">

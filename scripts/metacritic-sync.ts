@@ -22,32 +22,51 @@ const PLATFORMS = [
   { id: "switch", mc: "nintendo-switch", igdb: 130 },
 ] as const;
 
-// Gêneros do filtro do Metacritic (o "-" do nome vira "---" e a "/" vira "-or-"). Vários grandes (Platformer, Fighting,
-// Shooter, FPS, Tactics...) não devolvem nada lá; só entra o gênero que tiver pelo menos MIN_GENRE jogos na plataforma
-// (contando todos os anos). O que a lista mostra é só de FIRST_YEAR para cá.
-const GENRES: [slug: string, label: string][] = [
-  ["action-rpg", "RPG de ação"],
-  ["rpg", "RPG"],
-  ["roguelike", "Roguelike"],
-  ["action-adventure", "Ação e aventura"],
-  ["adventure", "Aventura"],
-  ["action", "Ação"],
-  ["survival", "Sobrevivência"],
-  ["third-person-shooter", "Tiro em 3ª pessoa"],
-  ["real---time-strategy", "Estratégia em tempo real"],
-  ["turn---based-strategy", "Estratégia por turnos"],
-  ["strategy", "Estratégia"],
-  ["card-battle", "Cartas"],
-  ["action-puzzle", "Ação e puzzle"],
-  ["puzzle", "Puzzle"],
-  ["sandbox", "Sandbox"],
-  ["simulation", "Simulação"],
-  ["racing", "Corrida"],
-  ["rhythm", "Ritmo"],
-  ["visual-novel", "Visual novel"],
-  ["arcade", "Arcade"],
+// Gêneros: o filtro de gênero do Metacritic marca poucos jogos (vários gêneros grandes nem devolvem nada), então a lista
+// de gênero é a base dos melhores do Metacritic desde FIRST_YEAR (na ordem e com a nota deles) separada pelo gênero,
+// tema ou palavra-chave do IGDB. Só entra o gênero com pelo menos MIN_GENRE jogos; cada lista mostra até MAX_GENRE.
+type Tax = { genres?: number[]; themes?: number[]; keywords?: number[] };
+const has = (list: number[] | undefined, ids: number[]) => !!list?.some((x) => ids.includes(x));
+const GENRES: [slug: string, label: string, test: (t: Tax) => boolean][] = [
+  ["rpg", "RPG", (t) => has(t.genres, [12])],
+  ["roguelike", "Roguelike e roguelite", (t) => has(t.keywords, [416, 17292])],
+  ["metroidvania", "Metroidvania", (t) => has(t.keywords, [477])],
+  ["soulslike", "Soulslike", (t) => has(t.keywords, [17326, 58746])],
+  ["acao", "Ação", (t) => has(t.themes, [1])],
+  ["aventura", "Aventura", (t) => has(t.genres, [31])],
+  ["plataforma", "Plataforma", (t) => has(t.genres, [8])],
+  ["tiro", "Tiro", (t) => has(t.genres, [5])],
+  ["hack-and-slash", "Hack and slash", (t) => has(t.genres, [25])],
+  ["luta", "Luta", (t) => has(t.genres, [4])],
+  ["corrida", "Corrida", (t) => has(t.genres, [10])],
+  ["esporte", "Esporte", (t) => has(t.genres, [14])],
+  ["estrategia", "Estratégia", (t) => has(t.genres, [15, 11, 16, 24])],
+  ["taticos", "Táticos e por turnos", (t) => has(t.genres, [16, 24])],
+  ["tempo-real", "Estratégia em tempo real", (t) => has(t.genres, [11])],
+  ["construcao", "Construção de cidades", (t) => has(t.keywords, [3533])],
+  ["simulacao", "Simulação", (t) => has(t.genres, [13])],
+  ["puzzle", "Puzzle", (t) => has(t.genres, [9])],
+  ["cartas", "Cartas e tabuleiro", (t) => has(t.genres, [35]) || has(t.keywords, [52703, 54521])],
+  ["point-and-click", "Point-and-click", (t) => has(t.genres, [2])],
+  ["visual-novel", "Visual novel", (t) => has(t.genres, [34])],
+  ["musica", "Ritmo e música", (t) => has(t.genres, [7])],
+  ["arcade", "Arcade", (t) => has(t.genres, [33])],
+  ["indie", "Indie", (t) => has(t.genres, [32])],
+  ["sobrevivencia", "Sobrevivência", (t) => has(t.themes, [21])],
+  ["terror", "Terror", (t) => has(t.themes, [19])],
+  ["mundo-aberto", "Mundo aberto", (t) => has(t.themes, [38])],
+  ["sandbox", "Sandbox", (t) => has(t.themes, [33])],
+  ["ficcao-cientifica", "Ficção científica", (t) => has(t.themes, [18])],
+  ["fantasia", "Fantasia", (t) => has(t.themes, [17])],
+  ["furtividade", "Furtividade", (t) => has(t.themes, [23])],
+  ["misterio", "Mistério", (t) => has(t.themes, [43])],
+  ["immersive-sim", "Immersive sim", (t) => has(t.keywords, [43194])],
+  ["cozy", "Cozy", (t) => has(t.keywords, [24685])],
 ];
-const MIN_GENRE = 15;
+const MIN_GENRE = 50;
+const MAX_GENRE = 100;
+// Base dos gêneros: todos os jogos com nota no Metacritic desde FIRST_YEAR, ano a ano (até POOL_PAGES páginas por ano)
+const POOL_PAGES = 20;
 const FIRST_YEAR = 2022;
 
 // want: quantos jogos achados no IGDB a lista deve ter (busca mais páginas até chegar lá ou acabar, no máximo MAX_PAGES)
@@ -109,18 +128,6 @@ async function main() {
     for (let y = year; y >= FIRST_YEAR; y--) {
       defs.push({ id: `${p.id}/ano-${y}`, platform: p.id, group: "ano", label: String(y), position: 100 + (year - y), path: `${p.mc}/all/${y}/metascore`, query: "", want: 50 });
     }
-    // Gênero só se tiver jogos suficientes nesta plataforma
-    for (const [i, [slug, label]] of GENRES.entries()) {
-      // O gênero entra pelo tamanho de sempre (mantém as mesmas listas); o conteúdo é só de FIRST_YEAR para cá
-      const { total } = await getMetacriticPage(`${p.mc}/all/all-time/metascore`, `genre=${slug}`);
-      await sleep(900);
-      if (total < MIN_GENRE) {
-        console.log(`  ${p.id} · ${label}: ${total} jogos, fica de fora`);
-        continue;
-      }
-      defs.push({ id: `${p.id}/genero-${slug}`, platform: p.id, group: "genero", label, position: 200 + i, path: `${p.mc}/all/all-time/metascore`, query: `genre=${slug}&${since}`, want: 50 });
-    }
-
     for (const d of defs) {
       // Página a página até ter `want` jogos achados no IGDB (DLCs e nomes sem par ficam de fora)
       const entries: MetacriticEntry[] = [];
@@ -142,6 +149,51 @@ async function main() {
       const values = { platform: d.platform, group: d.group, label: d.label, position: d.position, url: metacriticUrl(d.path, d.query), entries, updatedAt: new Date() };
       await db.insert(metacriticLists).values({ id: d.id, ...values }).onConflictDoUpdate({ target: metacriticLists.id, set: values });
     }
+    // Gêneros pelo IGDB: base dos melhores do Metacritic desde FIRST_YEAR, separada por gênero/tema/palavra-chave
+    // O Metacritic não passa da página 20 (1000 jogos): a base vem ano a ano e depois é ordenada pela nota
+    const pool: MetacriticEntry[] = [];
+    for (let y = year; y >= FIRST_YEAR; y--) {
+      const ofYear: MetacriticEntry[] = [];
+      for (let page = 1; page <= POOL_PAGES; page++) {
+        const { rows, total } = await getMetacriticPage(`${p.mc}/all/${y}/metascore`, "", page);
+        await sleep(900);
+        const todo = rows.filter((r) => !known.has(keyOf(p.id, r)));
+        const ids = todo.length ? await matchIds(todo, p.igdb) : [];
+        todo.forEach((r, i) => known.set(keyOf(p.id, r), ids[i]));
+        ofYear.push(...rows.map((r) => ({ ...r, igdbId: known.get(keyOf(p.id, r)) ?? null })));
+        if (ofYear.length >= total || !rows.length) break;
+      }
+      // Sem nota ainda ("tbd") não entra
+      pool.push(...ofYear.filter((e) => Number(e.score) > 0));
+    }
+    pool.sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0));
+    const inPool = [...new Set(pool.map((e) => e.igdbId).filter((x): x is number => x != null))];
+    const tax = new Map<number, Tax>();
+    for (let i = 0; i < inPool.length; i += 500) {
+      const rows = await igdb<(Tax & { id: number })[]>("games", `fields genres,themes,keywords; where id = (${inPool.slice(i, i + 500).join(",")}); limit 500;`);
+      for (const r of rows) tax.set(r.id, r);
+    }
+    console.log(`${p.id}: base de ${pool.length} jogos do Metacritic desde ${FIRST_YEAR}, ${inPool.length} no IGDB`);
+    const poolUrl = metacriticUrl(`${p.mc}/all/all-time/metascore`, since);
+    for (const [i, [slug, label, test]] of GENRES.entries()) {
+      const seen = new Set<number>();
+      const entries = pool.filter((e) => {
+        if (e.igdbId == null || seen.has(e.igdbId) || !test(tax.get(e.igdbId) ?? {})) return false;
+        seen.add(e.igdbId);
+        return true;
+      });
+      if (entries.length < MIN_GENRE) {
+        console.log(`  ${p.id} · ${label}: ${entries.length} jogos, fica de fora`);
+        continue;
+      }
+      const d = { id: `${p.id}/genero-${slug}`, platform: p.id, group: "genero", label, position: 200 + i };
+      defs.push({ ...d, path: "", query: "", want: 0 });
+      console.log(`${d.id}: ${Math.min(entries.length, MAX_GENRE)} jogos (de ${entries.length})`);
+      if (DRY) continue;
+      const values = { platform: d.platform, group: d.group, label: d.label, position: d.position, url: poolUrl, entries: entries.slice(0, MAX_GENRE), updatedAt: new Date() };
+      await db.insert(metacriticLists).values({ id: d.id, ...values }).onConflictDoUpdate({ target: metacriticLists.id, set: values });
+    }
+
     // Listas que não existem mais nesta rodada (ex.: gênero que caiu abaixo do mínimo) saem
     if (!DRY) {
       const keep = new Set(defs.map((d) => d.id));
