@@ -1,5 +1,5 @@
 import { ProfileHeader } from "@/components/profile-view";
-import { PushManager, ProviderPicker } from "@/components/settings";
+import { PushManager, ProviderPicker, ShotSpeedPicker } from "@/components/settings";
 import { TagManager } from "@/components/tag-manager";
 import { listBrProviders } from "@/lib/sources/tmdb";
 import { getProfile, requireUser } from "@/lib/session";
@@ -31,6 +31,12 @@ export default async function SettingsPage() {
         <h2 className="text-[22px] font-bold tracking-tight">Seus streamings</h2>
         <p className="mb-5 mt-1 text-[14px] text-text-2">O que já está liberado pra você ganha destaque, e o app avisa quando algo do backlog chegar.</p>
         <ProviderPicker providers={list.slice(0, 48).map(({ id, name, logo }) => ({ id, name, logo }))} selected={profile?.providerIds ?? []} />
+      </section>
+
+      <section>
+        <h2 className="text-[22px] font-bold tracking-tight">Screenshots no celular</h2>
+        <p className="mb-5 mt-1 text-[14px] text-text-2">Segurando o dedo numa capa, as imagens passam sozinhas. Quanto tempo cada uma fica na tela (vale só neste aparelho).</p>
+        <ShotSpeedPicker />
       </section>
 
       <section>

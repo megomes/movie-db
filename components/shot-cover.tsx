@@ -6,8 +6,10 @@ import { Check, Loader2, Plus } from "lucide-react";
 import { addItem, deleteItem } from "@/app/actions";
 import { useBacklog } from "./backlog-context";
 import { Cover } from "./cover";
+import { useHoldScrub } from "./hold-scrub";
 
-// Capa (jogo, filme ou série) que, com o mouse em cima, percorre as screenshots/cenas pela posição horizontal
+// Capa (jogo, filme ou série) que, com o mouse em cima, percorre as screenshots/cenas pela posição horizontal;
+// no celular, segurar o dedo passa as imagens sozinho
 export function ShotCover({
   id,
   kind = "game",
@@ -31,9 +33,11 @@ export function ShotCover({
 }) {
   const [shot, setShot] = useState<number | null>(null);
   const preloaded = useRef(false);
+  const hold = useHoldScrub(screenshots, setShot);
 
   return (
     <div
+      {...hold}
       className="relative overflow-hidden rounded-2xl transition-[scale,box-shadow] duration-300 group-hover:scale-[1.03] group-hover:shadow-[0_18px_50px_rgb(0_0_0/0.6)]"
       onPointerEnter={(e) => {
         if (e.pointerType !== "mouse" || !screenshots.length || preloaded.current) return;

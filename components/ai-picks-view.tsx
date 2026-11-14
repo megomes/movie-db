@@ -9,7 +9,7 @@ import { AI_SOURCES, aiSource, categoriesFor, type AiKind } from "@/lib/ai-picks
 import { ptGenre } from "@/lib/genres";
 import type { AiSuggestion } from "@/lib/queries";
 import { GUTTER } from "./rail";
-import { HOLD_CLASS, useMenuTrigger } from "./game-menu";
+import { CardMenuButton, HOLD_CLASS, useMenuTrigger, type MenuGame } from "./game-menu";
 import { BacklogButton, ShotCover, useBacklogToggle, type BacklogRef } from "./shot-cover";
 
 const KINDS: { id: AiKind; label: string }[] = [
@@ -148,6 +148,16 @@ export function AiPicksView({ kind, games, backlog }: { kind: AiKind; games: AiS
                     const item = owned[g.ref] ?? null;
                     const why = reasonsOf(g);
                     const href = item ? `/item/${item.id}` : kind === "game" ? `/jogo/${g.ref}` : `https://www.themoviedb.org/${kind === "movie" ? "movie" : "tv"}/${g.ref}`;
+                    const mg: MenuGame = {
+                                kind,
+                                igdbId: kind === "game" ? g.ref : null,
+                                tmdbId: kind === "game" ? null : g.ref,
+                                title: g.title,
+                                coverUrl: g.coverUrl,
+                                itemId: item?.id,
+                                done: item?.done,
+                                onSeen: () => setSeen((prev) => new Set(prev).add(g.ref)),
+                              };
                     return (
                       <motion.div
                         key={g.ref}
@@ -158,16 +168,7 @@ export function AiPicksView({ kind, games, backlog }: { kind: AiKind; games: AiS
                         <div className="rise" style={{ animationDelay: `${Math.min(idx, 18) * 20}ms` }}>
                           <div
                             className={`group relative ${HOLD_CLASS}`}
-                            {...menuProps({
-                                kind,
-                                igdbId: kind === "game" ? g.ref : null,
-                                tmdbId: kind === "game" ? null : g.ref,
-                                title: g.title,
-                                coverUrl: g.coverUrl,
-                                itemId: item?.id,
-                                done: item?.done,
-                                onSeen: () => setSeen((prev) => new Set(prev).add(g.ref)),
-                              })}
+                            {...menuProps(mg)}
                           >
                             <Link
                               href={href}
@@ -184,7 +185,7 @@ export function AiPicksView({ kind, games, backlog }: { kind: AiKind; games: AiS
                                 eager={idx < 12}
                                 overlay={(scrubbing) => (
                                   <>
-                                    <div className="pointer-events-none absolute left-2 right-11 top-2 flex flex-wrap items-start gap-1">
+                                    <div className="pointer-events-none absolute left-2 right-11 top-2 flex flex-wrap [@media(hover:none)]:right-20 items-start gap-1">
                                       {AI_SOURCES.filter((src) => g.sources.includes(src.id)).map((src) => (
                                         <span
                                           key={src.id}
@@ -215,6 +216,7 @@ export function AiPicksView({ kind, games, backlog }: { kind: AiKind; games: AiS
                               />
                             </Link>
                             {!item?.done && <BacklogButton on={!!item} busy={busy.has(g.ref)} onClick={() => toggle(g.ref)} />}
+                            <CardMenuButton game={mg} className={item?.done ? "right-2" : "right-11"} />
                           </div>
                           <p className="mt-2 truncate text-[13px] font-medium leading-tight" title={g.title}>
                             {g.title}

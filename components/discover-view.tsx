@@ -9,7 +9,7 @@ import { LISTS, listsFor, platformOf, PLATFORMS, type DiscoverGroup, type ListId
 import { ptGenre } from "@/lib/genres";
 import { DiscoverGridSkeleton } from "./discover-skeleton";
 import { GUTTER } from "./rail";
-import { HOLD_CLASS, useMenuTrigger } from "./game-menu";
+import { CardMenuButton, HOLD_CLASS, useMenuTrigger } from "./game-menu";
 import { BacklogButton, ShotCover, useBacklogToggle, type BacklogRef } from "./shot-cover";
 
 const dateFmt = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
@@ -193,6 +193,7 @@ export function DiscoverView({
             <div className={`grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 lg:gap-x-5 lg:gap-y-7 2xl:grid-cols-8 ${GUTTER}`}>
               {s.visible.map((g, idx) => {
                 const item = owned[g.igdbId] ?? null;
+                const mg = { igdbId: g.igdbId, title: g.title, coverUrl: g.coverUrl, itemId: item?.id, done: item?.done };
                 const rank = s.games.indexOf(g) + 1;
                 const when = list === "soon" ? (g.releaseDate ? dateFmt.format(new Date(g.releaseDate)) : "Sem data") : g.year;
                 const cover = (
@@ -202,8 +203,11 @@ export function DiscoverView({
                     coverUrl={g.coverUrl}
                     screenshots={g.screenshots}
                     eager={idx < 12}
-                    overlay={() => (
-                      <div className="pointer-events-none absolute left-2 top-2 flex flex-col items-start gap-1">
+                    overlay={(scrubbing) => (
+                      // No celular os botões (...) e (+) ocupam o topo: os selos vão para o pé da capa
+                      <div
+                        className={`pointer-events-none absolute left-2 top-2 flex flex-col items-start gap-1 [@media(hover:none)]:bottom-2 [@media(hover:none)]:top-auto ${scrubbing ? "[@media(hover:none)]:opacity-0" : ""}`}
+                      >
                         <span className="rounded-full bg-black/65 px-2 py-0.5 text-[11px] font-semibold tabular-nums ring-1 ring-white/10">
                           #{rank}
                           {g.score ? (
@@ -225,12 +229,13 @@ export function DiscoverView({
                   <div key={g.igdbId} className="rise" style={{ animationDelay: `${Math.min(idx, 18) * 20}ms` }}>
                     <div
                       className={`group relative ${HOLD_CLASS}`}
-                      {...menuProps({ igdbId: g.igdbId, title: g.title, coverUrl: g.coverUrl, itemId: item?.id, done: item?.done })}
+                      {...menuProps(mg)}
                     >
                       <Link href={item ? `/item/${item.id}` : `/jogo/${g.igdbId}`} aria-label={g.title} className="block">
                         {cover}
                       </Link>
                       {!item?.done && <BacklogButton on={!!item} busy={busy.has(g.igdbId)} onClick={() => toggle(g.igdbId)} />}
+                      <CardMenuButton game={mg} className={item?.done ? "right-2" : "right-11"} />
                     </div>
                     <p className="mt-2 truncate text-[13px] font-medium leading-tight" title={g.title}>
                       {g.title}

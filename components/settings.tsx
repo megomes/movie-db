@@ -2,11 +2,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { Bell, BellOff, Check, LogOut, Loader2 } from "lucide-react";
 import { removePushSubscription, savePushSubscription, saveProviders, sendTestPush } from "@/app/actions";
 import { authClient } from "@/lib/auth/client";
 import type { Provider } from "@/lib/db/schema";
+import { DEFAULT_SHOT_SPEED, readShotSpeed, SHOT_SPEED_KEY, SHOT_SPEEDS } from "./hold-scrub";
 
 export function ProviderPicker({ providers, selected }: { providers: Provider[]; selected: number[] }) {
   const [value, setValue] = useState(new Set(selected));
@@ -160,5 +161,36 @@ export function SignOutButton() {
     >
       <LogOut size={16} /> Sair
     </button>
+  );
+}
+
+const noSubscribe = () => () => {};
+
+// Quanto tempo cada screenshot fica ao segurar a capa no celular (só neste aparelho)
+export function ShotSpeedPicker() {
+  const [picked, setValue] = useState<number | null>(null);
+  const stored = useSyncExternalStore(noSubscribe, readShotSpeed, () => DEFAULT_SHOT_SPEED);
+  const value = picked ?? stored;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {SHOT_SPEEDS.map((s) => {
+        const on = value === s.ms;
+        return (
+          <button
+            key={s.ms}
+            onClick={() => {
+              setValue(s.ms);
+              try {
+                localStorage.setItem(SHOT_SPEED_KEY, String(s.ms));
+              } catch {}
+            }}
+            aria-pressed={on}
+            className={`tap flex h-10 items-center gap-1.5 rounded-full px-4 text-[14px] font-medium transition-colors ${on ? "btn-accent" : "glass text-white/75 hover:text-white"}`}
+          >
+            {s.label} <span className={on ? "text-white/75" : "text-text-3"}>{s.hint}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }

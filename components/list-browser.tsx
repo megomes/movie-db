@@ -13,7 +13,7 @@ import { ptGenre } from "@/lib/genres";
 import { accessFor, formatSize, KIND_META, KINDS } from "@/lib/kinds";
 import type { InstalledLite, LiteItem, TagLite } from "@/lib/queries";
 import { useBacklog } from "./backlog-context";
-import { HOLD_CLASS, useMenuTrigger } from "./game-menu";
+import { CardMenuButton, HOLD_CLASS, useMenuTrigger } from "./game-menu";
 import { Poster } from "./poster";
 import { ShotCover } from "./shot-cover";
 import { GUTTER } from "./rail";
@@ -490,13 +490,10 @@ type Section = { key: string; title: string; hint?: string; href: string | undef
 // Jogo instalado que não está no backlog: capa com screenshots, um pouco apagada; o botão direito põe no backlog
 function InstalledCard({ row, label }: { row: InstalledLite; label: string }) {
   const menuProps = useMenuTrigger();
+  const mg = { igdbId: row.igdbId, title: row.title, coverUrl: row.coverUrl };
   return (
-    <Link
-      href={`/jogo/${row.igdbId}`}
-      aria-label={row.title}
-      className={`group relative block ${HOLD_CLASS}`}
-      {...menuProps({ igdbId: row.igdbId, title: row.title, coverUrl: row.coverUrl })}
-    >
+    <Link href={`/jogo/${row.igdbId}`} aria-label={row.title} className={`group relative block ${HOLD_CLASS}`} {...menuProps(mg)}>
+      <CardMenuButton game={mg} />
       <ShotCover
         id={row.id}
         title={row.title}

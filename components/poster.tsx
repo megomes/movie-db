@@ -10,7 +10,8 @@ import { accessFor, formatMinutes, KIND_META, scoreLabel } from "@/lib/kinds";
 import type { LiteItem } from "@/lib/queries";
 import { useBacklog } from "./backlog-context";
 import { Cover } from "./cover";
-import { HOLD_CLASS, useMenuTrigger } from "./game-menu";
+import { CardMenuButton, HOLD_CLASS, useMenuTrigger } from "./game-menu";
+import { useHoldScrub } from "./hold-scrub";
 import { KIND_ICONS } from "./kind-icon";
 
 // Pôster interativo: inclina com o mouse (desktop), mostra nota e revela infos no hover.
@@ -42,6 +43,8 @@ export function Poster({
   const shots = item.shots ?? [];
   const [shot, setShot] = useState<number | null>(null);
   const preloaded = useRef(false);
+  const hold = useHoldScrub(shots, setShot);
+  const mg = { kind: item.kind, igdbId: item.igdbId, tmdbId: item.tmdbId, title: item.title, coverUrl: item.coverUrl, itemId: item.id };
   const mx = useMotionValue(0);
   const my = useMotionValue(0);
   const rx = useSpring(useTransform(my, [-0.5, 0.5], [7, -7]), { stiffness: 260, damping: 20 });
@@ -57,7 +60,8 @@ export function Poster({
       href={href ?? `/item/${item.id}`}
       className={`group relative block outline-none hover:z-10 ${HOLD_CLASS}`}
       aria-label={item.title}
-      {...menuProps({ kind: item.kind, igdbId: item.igdbId, tmdbId: item.tmdbId, title: item.title, coverUrl: item.coverUrl, itemId: item.id })}
+      {...menuProps(mg)}
+      {...hold}
       onPointerEnter={(e) => {
         if (e.pointerType !== "mouse" || !shots.length || preloaded.current) return;
         preloaded.current = true;
@@ -112,10 +116,11 @@ export function Poster({
             </span>
           )}
           {item.pinned && (
-            <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-danger/90">
+            <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-danger/90 [@media(hover:none)]:right-3 [@media(hover:none)]:top-11">
               <Heart size={12} className="fill-white text-white" />
             </span>
           )}
+          <CardMenuButton game={mg} />
           {installed && shot == null && (
             <span className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-success/90 px-2 py-0.5 text-[10.5px] font-semibold text-black group-hover:opacity-0">
               <HardDrive size={10} /> {installed}

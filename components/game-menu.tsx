@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { BookCheck, CircleCheckBig, Download, ExternalLink, Eye, EyeOff, HardDrive, Heart, HeartOff, Loader2, Plus, Trash2, Trophy } from "lucide-react";
+import { BookCheck, CircleCheckBig, Download, ExternalLink, Eye, EyeOff, HardDrive, Heart, HeartOff, Loader2, MoreHorizontal, Plus, Trash2, Trophy } from "lucide-react";
 import { addItem, addSeen, deleteItem, markDone, setHiddenPlatforms, togglePin } from "@/app/actions";
 import { formatSize } from "@/lib/kinds";
 import { useBacklog } from "./backlog-context";
@@ -30,60 +30,50 @@ const OpenMenu = createContext<(e: React.MouseEvent, game: MenuGame) => void>(()
 /** Handler para onContextMenu: abre o menu do jogo no lugar do clique */
 export const useGameMenu = () => useContext(OpenMenu);
 
-// Engole o clique que o navegador manda ao soltar o dedo depois de segurar (senão abriria o link do card)
-function swallowNextClick() {
-  const stop = (e: MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-  window.addEventListener("click", stop, { capture: true, once: true });
-  setTimeout(() => window.removeEventListener("click", stop, { capture: true }), 700);
-}
-
-const HOLD_MS = 450;
+// Dedo na tela agora? No Android, segurar dispara o "contextmenu" (botão direito): aí é o segurar das screenshots, não o menu
+let touchDown = false;
 
 /**
- * Props para o card: botão direito no computador e segurar o dedo no celular abrem o mesmo menu.
+ * Props para o card: botão direito no computador abre o menu. No celular o menu vem do botão (...) do card
+ * (CardMenuButton) e segurar o dedo passa as screenshots (useHoldScrub).
  * Uso: <div {...menuProps({ ... })}>
  */
 export function useMenuTrigger() {
   const open = useContext(OpenMenu);
-  const hold = useRef<{ timer: number; x: number; y: number } | null>(null);
   return useCallback(
-    (game: MenuGame) => {
-      const cancel = () => {
-        if (hold.current) clearTimeout(hold.current.timer);
-        hold.current = null;
-      };
-      return {
-        onContextMenu: (e: React.MouseEvent) => open(e, game),
-        onTouchStart: (e: React.TouchEvent) => {
-          if (e.touches.length !== 1) return cancel();
-          const { clientX: x, clientY: y } = e.touches[0];
-          cancel();
-          const timer = window.setTimeout(() => {
-            hold.current = null;
-            navigator.vibrate?.(12);
-            swallowNextClick();
-            open({ clientX: x, clientY: y, preventDefault() {}, stopPropagation() {} } as React.MouseEvent, game);
-          }, HOLD_MS);
-          hold.current = { timer, x, y };
-        },
-        // Mexeu o dedo (rolando a tela): não é segurar
-        onTouchMove: (e: React.TouchEvent) => {
-          const h = hold.current;
-          const t = e.touches[0];
-          if (h && Math.hypot(t.clientX - h.x, t.clientY - h.y) > 10) cancel();
-        },
-        onTouchEnd: cancel,
-        onTouchCancel: cancel,
-      };
-    },
+    (game: MenuGame) => ({
+      onContextMenu: (e: React.MouseEvent) => {
+        if (touchDown) return e.preventDefault();
+        open(e, game);
+      },
+    }),
     [open],
   );
 }
 
-/** Classes para o card que abre o menu segurando: sem seleção de texto nem o menu do sistema (iOS) */
+/** Botão (...) no canto da capa, só em telas de toque: abre o mesmo menu do botão direito logo abaixo dele */
+export function CardMenuButton({ game, className = "right-2" }: { game: MenuGame; className?: string }) {
+  const open = useContext(OpenMenu);
+  return (
+    <span
+      role="button"
+      tabIndex={-1}
+      aria-label="Mais opções"
+      onTouchStart={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const r = e.currentTarget.getBoundingClientRect();
+        open({ clientX: r.left, clientY: r.bottom + 6, preventDefault() {}, stopPropagation() {} } as React.MouseEvent, game);
+      }}
+      className={`tap absolute top-2 z-10 hidden h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white/85 ring-1 ring-white/15 [@media(hover:none)]:flex ${className}`}
+    >
+      <MoreHorizontal size={17} strokeWidth={2.4} />
+    </span>
+  );
+}
+
+/** Classes para o card que se segura (screenshots): sem seleção de texto nem o menu do sistema (iOS) */
 export const HOLD_CLASS = "select-none [-webkit-touch-callout:none]";
 
 const PLATFORMS: { id: InstallPlatform; label: string }[] = [
@@ -108,6 +98,19 @@ export function GameMenuProvider({ children }: { children: React.ReactNode }) {
     e.preventDefault();
     e.stopPropagation();
     setMenu({ x: e.clientX, y: e.clientY, game });
+  }, []);
+
+  useEffect(() => {
+    const down = () => (touchDown = true);
+    const up = () => (touchDown = false);
+    window.addEventListener("touchstart", down, { capture: true, passive: true });
+    window.addEventListener("touchend", up, { capture: true, passive: true });
+    window.addEventListener("touchcancel", up, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener("touchstart", down, { capture: true });
+      window.removeEventListener("touchend", up, { capture: true });
+      window.removeEventListener("touchcancel", up, { capture: true });
+    };
   }, []);
 
   const installedRow = install ? installed.find((r) => r.igdbId === install.game.igdbId && r.platform === install.platform) : null;
