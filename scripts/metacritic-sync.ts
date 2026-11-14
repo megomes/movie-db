@@ -111,6 +111,21 @@ async function matchIds(rows: MetacriticRow[], platform: number): Promise<(numbe
   return out;
 }
 
+// Lançamento original pelo IGDB: o Metacritic data pela versão da plataforma (God of War de 2018 chega ao PC em 2022
+// e conta como 2022). Jogo que saiu antes de FIRST_YEAR em qualquer lugar não entra em lista nenhuma.
+const origYear = new Map<number, number | null>();
+async function loadOrigYears(ids: (number | null)[]) {
+  const todo = [...new Set(ids.filter((x): x is number => x != null && !origYear.has(x)))];
+  for (let i = 0; i < todo.length; i += 500) {
+    const chunk = todo.slice(i, i + 500);
+    const rows = await igdb<Raw[]>("games", `fields first_release_date; where id = (${chunk.join(",")}); limit 500;`);
+    for (const id of chunk) origYear.set(id, null);
+    for (const g of rows) origYear.set(g.id, yearOf(g));
+  }
+}
+const isOld = (e: MetacriticEntry) => e.igdbId != null && (origYear.get(e.igdbId) ?? FIRST_YEAR) < FIRST_YEAR;
+let dropped: string[] = [];
+
 async function main() {
   // Correspondências já feitas antes (mesmo nome, ano e plataforma): não procura de novo
   const known = new Map<string, number | null>();
@@ -132,6 +147,7 @@ async function main() {
       // Página a página até ter `want` jogos achados no IGDB (DLCs e nomes sem par ficam de fora)
       const entries: MetacriticEntry[] = [];
       let searched = 0;
+      dropped = [];
       for (let page = 1; page <= MAX_PAGES; page++) {
         const { rows, total } = await getMetacriticPage(d.path, d.query, page);
         await sleep(900);
@@ -139,12 +155,18 @@ async function main() {
         const ids = todo.length ? await matchIds(todo, p.igdb) : [];
         todo.forEach((r, i) => known.set(keyOf(p.id, r), ids[i]));
         searched += todo.length;
-        entries.push(...rows.map((r) => ({ ...r, igdbId: known.get(keyOf(p.id, r)) ?? null })));
-        if (entries.filter((e) => e.igdbId != null).length >= d.want || entries.length >= total || !rows.length) break;
+        const page_ = rows.map((r) => ({ ...r, igdbId: known.get(keyOf(p.id, r)) ?? null }));
+        await loadOrigYears(page_.map((e) => e.igdbId));
+        for (const e of page_) {
+          if (isOld(e)) dropped.push(`${e.title} (${origYear.get(e.igdbId!)})`);
+          else entries.push(e);
+        }
+        if (entries.filter((e) => e.igdbId != null).length >= d.want || page * 50 >= total || !rows.length) break;
       }
       const rows = entries;
       const hit = entries.filter((e) => e.igdbId != null).length;
-      console.log(`${d.id}: ${rows.length} no Metacritic, ${hit} no IGDB (${searched} procurados agora)`);
+      console.log(`${d.id}: ${rows.length} no Metacritic, ${hit} no IGDB (${searched} procurados agora); fora por serem antigos: ${dropped.length}`);
+      if (dropped.length) console.log(`  antigos: ${dropped.slice(0, 12).join(", ")}${dropped.length > 12 ? "…" : ""}`);
       if (DRY || !rows.length) continue;
       const values = { platform: d.platform, group: d.group, label: d.label, position: d.position, url: metacriticUrl(d.path, d.query), entries, updatedAt: new Date() };
       await db.insert(metacriticLists).values({ id: d.id, ...values }).onConflictDoUpdate({ target: metacriticLists.id, set: values });
@@ -161,10 +183,11 @@ async function main() {
         const ids = todo.length ? await matchIds(todo, p.igdb) : [];
         todo.forEach((r, i) => known.set(keyOf(p.id, r), ids[i]));
         ofYear.push(...rows.map((r) => ({ ...r, igdbId: known.get(keyOf(p.id, r)) ?? null })));
-        if (ofYear.length >= total || !rows.length) break;
+        if (page * 50 >= total || !rows.length) break;
       }
       // Sem nota ainda ("tbd") não entra
-      pool.push(...ofYear.filter((e) => Number(e.score) > 0));
+      await loadOrigYears(ofYear.map((e) => e.igdbId));
+      pool.push(...ofYear.filter((e) => Number(e.score) > 0 && !isOld(e)));
     }
     pool.sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0));
     const inPool = [...new Set(pool.map((e) => e.igdbId).filter((x): x is number => x != null))];
