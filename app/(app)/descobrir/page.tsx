@@ -1,5 +1,5 @@
 import { DiscoverView } from "@/components/discover-view";
-import { getDiscoverGroups, isListId, isPlatformId, LISTS, PLATFORMS } from "@/lib/discover";
+import { getDiscoverGroups, isListId, isPlatformId, LISTS, listsFor, PLATFORMS } from "@/lib/discover";
 import { backlogByIgdb, listSwitchGames } from "@/lib/queries";
 import { requireUser } from "@/lib/session";
 
@@ -8,8 +8,9 @@ export const metadata = { title: "Descobrir jogos" };
 export default async function DiscoverPage({ searchParams }: PageProps<"/descobrir">) {
   const user = await requireUser();
   const sp = await searchParams;
-  const list = isListId(sp.lista) ? sp.lista : LISTS[0].id;
   const platform = isPlatformId(sp.plataforma) ? sp.plataforma : PLATFORMS[0].id;
+  // Lista que não existe na plataforma (Metacritic no Android) cai na primeira
+  const list = isListId(sp.lista) && listsFor(platform).some((l) => l.id === sp.lista) ? sp.lista : LISTS[0].id;
 
   const [groups, installed] = await Promise.all([getDiscoverGroups(platform, list), platform === "switch" ? listSwitchGames(user.id) : []]);
   const backlog = await backlogByIgdb(user.id, groups.flatMap((g) => g.games.map((x) => x.igdbId)));

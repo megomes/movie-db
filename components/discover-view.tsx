@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { ArrowLeft, Gamepad2 } from "lucide-react";
-import { LISTS, platformOf, PLATFORMS, type DiscoverGroup, type ListId, type PlatformId } from "@/lib/discover-lists";
+import { LISTS, listsFor, platformOf, PLATFORMS, type DiscoverGroup, type ListId, type PlatformId } from "@/lib/discover-lists";
 import { ptGenre } from "@/lib/genres";
 import { GUTTER } from "./rail";
 import { HOLD_CLASS, useMenuTrigger } from "./game-menu";
@@ -64,7 +64,8 @@ export function DiscoverView({
             {PLATFORMS.map((p) => (
               <Link
                 key={p.id}
-                href={href(p.id, list)}
+                // Sem a lista no Metacritic (Android): cai em "Melhores"
+                href={href(p.id, listsFor(p.id).some((l) => l.id === list) ? list : "top")}
                 scroll={false}
                 aria-current={platform === p.id ? "page" : undefined}
                 className={`tap rounded-full px-4 py-2 text-[14px] font-semibold transition-colors ${platform === p.id ? "bg-white text-black" : "text-white/70 hover:text-white"}`}
@@ -82,7 +83,7 @@ export function DiscoverView({
       <div className={`sticky top-0 z-30 mt-4 space-y-2.5 py-3 lg:top-20 ${GUTTER}`}>
         <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
           <nav className="glass no-scrollbar inline-flex max-w-full gap-1 overflow-x-auto rounded-full p-1">
-            {LISTS.map((l) => (
+            {listsFor(platform).map((l) => (
               <Link key={l.id} href={href(platform, l.id)} scroll={false} className="relative shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium">
                 {list === l.id && <motion.span layoutId="discover-list" className="btn-accent absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
                 <span className={`relative ${list === l.id ? "text-white" : "text-white/70"}`}>{l.short}</span>
@@ -126,7 +127,11 @@ export function DiscoverView({
                       <div className="pointer-events-none absolute left-2 top-2 flex flex-col items-start gap-1">
                         <span className="rounded-full bg-black/65 px-2 py-0.5 text-[11px] font-semibold tabular-nums ring-1 ring-white/10">
                           #{rank}
-                          {g.rating != null && list !== "soon" && <span className="text-white/70"> · ★ {g.rating}</span>}
+                          {g.score ? (
+                            <span className="text-white/70"> · MC {g.score}</span>
+                          ) : (
+                            g.rating != null && list !== "soon" && <span className="text-white/70"> · ★ {g.rating}</span>
+                          )}
                         </span>
                         {installed.has(g.igdbId) && (
                           <span className="flex items-center gap-1 rounded-full bg-success/90 px-2 py-0.5 text-[11px] font-semibold text-black">
