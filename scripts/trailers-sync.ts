@@ -1,28 +1,27 @@
 /**
- * Lista "Trailers" do Descobrir: os jogos cujos trailers foram mais vistos nos canais GameTrailers e IGN desde 2022.
+ * Listas do GameTrailers e da IGN no Descobrir: os jogos cujos trailers foram mais vistos em cada canal desde 2022
+ * (geral, por ano do trailer e por gênero do IGDB), por plataforma. Ficam na mesma tabela das listas do Metacritic.
  *   npm run sync:trailers                        -> lista os canais com o yt-dlp (precisa estar instalado) e grava
- *   npm run sync:trailers -- --tsv=a.tsv,b.tsv   -> usa listagens já baixadas (id, timestamp, views, duração, título)
+ *   npm run sync:trailers -- --tsv=a.tsv,b.tsv   -> usa listagens já baixadas (yt-GameTrailers.tsv, yt-IGN.tsv)
  *   npm run sync:trailers -- --dry               -> só mostra o que faria
- * Do título do vídeo sai o nome do jogo ("Nome - Official ... Trailer"); trailers de filme/série ficam de fora.
- * Soma as visualizações por jogo, liga ao IGDB pelo nome e guarda na tabela trailer_games (só jogos de 2022 para cá
- * ou ainda sem data). A página busca capa/screenshots no IGDB pelos ids.
+ * Do título do vídeo sai o nome do jogo ("Nome - Official ... Trailer"); trailers de filme/série e anúncios pagos ficam
+ * de fora. Liga ao IGDB pelo nome (só jogos de 2022 para cá ou sem data); DLC conta para o jogo principal.
  */
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { basename } from "node:path";
-import { inArray } from "drizzle-orm";
-import { db, trailerGames, youtubeLikes, type TrailerVideo } from "../lib/db";
-import { GAME_TYPES, igdb } from "../lib/sources/igdb";
+import { eq, inArray } from "drizzle-orm";
+import { db, metacriticLists, youtubeLikes, type MetacriticEntry } from "../lib/db";
+import { GENRES, MAX_GENRE, MIN_GENRE, type Tax } from "../lib/game-genres";
+import { igdb } from "../lib/sources/igdb";
 import { normalize } from "../lib/sources/http";
 
 const arg = (name: string) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
 const DRY = process.argv.includes("--dry");
-const CHANNELS = ["GameTrailers", "IGN"];
 const SINCE = Date.UTC(2022, 0, 1) / 1000;
-// Quantos nomes (os mais vistos) procurar no IGDB, quantos pela busca quando o nome exato não bate, e quantos jogos guardar
-const MAX_NAMES = 3000;
-const MAX_SEARCH = 900;
-const KEEP = 1000;
+// Quantos nomes (os mais vistos) procurar no IGDB e quantas buscas fazer quando o nome exato não bate
+const MAX_NAMES = 8000;
+const MAX_SEARCH = 2500;
 // Anúncio pago: trailer com muita visualização e quase nenhuma curtida (trailer de verdade fica entre 0,5% e 3%)
 const CHECK_VIEWS = 300_000;
 const AD_RATIO = 0.0015;
@@ -113,6 +112,16 @@ const key = (s: string) =>
     .map((w) => ROMAN[w] ?? w)
     .join(" ");
 
+// Outras formas do nome para achar no IGDB, da mais segura para a menos: sem "Remake"/"Edition"; cada jogo de um par
+// ("Pokemon Scarlet and Pokemon Violet"); o nome antes dos dois-pontos (DLC/temporada -> o jogo)
+const EDITION = /\s+(remake|remastered|remaster|definitive edition|deluxe edition|gold edition|complete edition|game of the year edition|goty edition|enhanced edition|director'?s cut)$/i;
+function variants(names: string[]): string[][] {
+  const stripped = names.map((n) => n.replace(EDITION, "").trim()).filter((n) => !names.includes(n));
+  const parts = names.flatMap((n) => (/\s(and|&|\+)\s/i.test(n) ? n.split(/\s+(?:and|&|\+)\s+/i).map((x) => x.trim()) : [])).filter((x) => x.length > 2);
+  const prefix = names.flatMap((n) => (n.includes(":") ? [n.slice(0, n.indexOf(":")).trim()] : [])).filter((x) => x.length > 2);
+  return [names, stripped, parts, prefix].filter((v) => v.length);
+}
+
 type Raw = {
   id: number;
   name: string;
@@ -120,14 +129,36 @@ type Raw = {
   platforms?: number[];
   total_rating_count?: number;
   hypes?: number;
+  game_type?: number;
+  parent_game?: number;
   alternative_names?: { name: string }[];
 };
-const FIELDS = "fields name,first_release_date,platforms,total_rating_count,hypes,alternative_names.name";
-const recent = (g: Raw) => !g.first_release_date || g.first_release_date >= SINCE;
-// Mais de um jogo com o mesmo nome: o recente (ou sem data) e mais falado
+const FIELDS = "fields name,first_release_date,platforms,total_rating_count,hypes,game_type,parent_game,alternative_names.name";
+// Também DLC (1) e expansão (2): os trailers delas contam para o jogo principal
+const MATCH_TYPES = "(0,1,2,4,8,9,10,11)";
+const recentTs = (ts?: number) => !ts || ts >= SINCE;
+// Mais de um jogo com o mesmo nome: jogo principal antes de DLC, o recente (ou sem data) e o mais falado
 const best = (list: Raw[]) =>
-  [...list].sort((a, b) => Number(recent(b)) - Number(recent(a)) || (b.hypes ?? 0) + (b.total_rating_count ?? 0) - ((a.hypes ?? 0) + (a.total_rating_count ?? 0)))[0];
+  [...list].sort(
+    (a, b) =>
+      Number(![1, 2].includes(b.game_type ?? 0)) - Number(![1, 2].includes(a.game_type ?? 0)) ||
+      Number(recentTs(b.first_release_date)) - Number(recentTs(a.first_release_date)) ||
+      (b.hypes ?? 0) + (b.total_rating_count ?? 0) - ((a.hypes ?? 0) + (a.total_rating_count ?? 0)),
+  )[0];
 const quote = (s: string) => s.replace(/["\\]/g, "");
+
+type Info = Tax & { id: number; name: string; first_release_date?: number; platforms?: number[] };
+const DISCOVER = [
+  { id: "pc", igdb: 6 },
+  { id: "switch", igdb: 130 },
+  { id: "android", igdb: 34 },
+];
+const SOURCES = [
+  { id: "gametrailers", channel: "GameTrailers" },
+  { id: "ign", channel: "IGN" },
+];
+const TOP = 150;
+const PER_YEAR = 100;
 
 async function main() {
   const tsv = arg("tsv");
@@ -135,9 +166,9 @@ async function main() {
   if (tsv) {
     for (const f of tsv.split(",")) videos.push(...parse(readFileSync(f, "utf8"), basename(f).replace(/^yt-|\.tsv$/g, "")));
   } else {
-    for (const ch of CHANNELS) {
-      const v = await listChannel(ch);
-      console.log(`${ch}: ${v.length} vídeos desde 2022`);
+    for (const s of SOURCES) {
+      const v = await listChannel(s.channel);
+      console.log(`${s.channel}: ${v.length} vídeos desde 2022`);
       videos.push(...v);
     }
   }
@@ -158,104 +189,174 @@ async function main() {
     const vals = [...fresh].map(([videoId, x]) => ({ videoId, views: x.views, likes: x.likes }));
     for (let i = 0; i < vals.length; i += 200) await db.insert(youtubeLikes).values(vals.slice(i, i + 200)).onConflictDoNothing();
   }
-  const ads = new Set(big.filter((v) => { const x = likes.get(v.id); return x?.likes != null && x.likes / Math.max(1, x.views) < AD_RATIO; }).map((v) => v.id));
+  const ads = new Set(
+    big
+      .filter((v) => {
+        const x = likes.get(v.id);
+        return x?.likes != null && x.likes / Math.max(1, x.views) < AD_RATIO;
+      })
+      .map((v) => v.id),
+  );
   console.log(`anúncios pagos fora: ${ads.size}`);
-  for (const v of big.filter((x) => ads.has(x.id)).sort((a, b) => b.views - a.views).slice(0, 15)) console.log(`  ${(v.views / 1e6).toFixed(1)} mi · ${likes.get(v.id)?.likes} curtidas · ${v.title}`);
 
-  // Agrupa por nome do jogo
-  type Group = { names: Set<string>; views: number; videos: TrailerVideo[] };
+  // Agrupa os trailers por nome do jogo (os dois canais juntos para procurar no IGDB uma vez só)
+  type Group = { names: string[]; views: number; videos: Video[] };
   const groups = new Map<string, Group>();
-  let trailers = 0;
   for (const v of inRange) {
     if (ads.has(v.id)) continue;
     const names = gameNames(v.title);
     if (!names) continue;
-    trailers++;
     const k = key(names[0]);
-    const g = groups.get(k) ?? { names: new Set<string>(), views: 0, videos: [] };
-    names.forEach((n) => g.names.add(n));
+    const g = groups.get(k) ?? { names: [], views: 0, videos: [] };
+    for (const n of names) if (!g.names.includes(n)) g.names.push(n);
     g.views += v.views;
-    g.videos.push({ id: v.id, title: v.title, views: v.views, channel: v.channel });
+    g.videos.push(v);
     groups.set(k, g);
   }
   const ranked = [...groups.values()].sort((a, b) => b.views - a.views).slice(0, MAX_NAMES);
-  console.log(`${inRange.length} vídeos, ${trailers} trailers de jogo, ${groups.size} nomes; procurando os ${ranked.length} mais vistos no IGDB`);
+  const trailerCount = [...groups.values()].reduce((n, g) => n + g.videos.length, 0);
+  console.log(`${inRange.length} vídeos, ${trailerCount} trailers de jogo, ${groups.size} nomes; procurando os ${ranked.length} mais vistos no IGDB`);
 
-  // 1) Nome exato (25 por consulta), comparando sem pontuação e com romanos = algarismos, inclusive nomes alternativos
+  // 1) Nome exato (25 por consulta) de todas as formas do nome, comparando sem pontuação e com romanos = algarismos
   const byKey = new Map<string, Raw[]>();
   const add = (k: string, g: Raw) => byKey.set(k, [...(byKey.get(k) ?? []).filter((x) => x.id !== g.id), g]);
-  const allNames = [...new Set(ranked.flatMap((g) => [...g.names]))];
+  const allNames = [...new Set(ranked.flatMap((g) => variants(g.names).flat()))];
   for (let i = 0; i < allNames.length; i += 25) {
     const where = allNames
       .slice(i, i + 25)
       .map((n) => `name ~ "${quote(n)}"`)
       .join(" | ");
-    const found = await igdb<Raw[]>("games", `${FIELDS}; where (${where}) & game_type = ${GAME_TYPES}; limit 500;`);
+    const found = await igdb<Raw[]>("games", `${FIELDS}; where (${where}) & game_type = ${MATCH_TYPES}; limit 500;`);
     for (const g of found) add(key(g.name), g);
   }
-  const matchOf = (grp: Group) => {
-    for (const n of grp.names) {
+  const lookup = (names: string[]) => {
+    for (const n of names) {
       const list = byKey.get(key(n));
       if (list?.length) return best(list);
     }
     return undefined;
   };
+  const matchOf = (grp: Group) => {
+    for (const v of variants(grp.names)) {
+      const g = lookup(v);
+      if (g) return g;
+    }
+    return undefined;
+  };
 
-  // 2) Quem não bateu: busca do IGDB, aceitando só nome (ou nome alternativo) igual
+  // 2) Quem não bateu: busca do IGDB pelo nome principal (e pelos sem "Remake"), aceitando só nome ou nome alternativo igual
   let searched = 0;
   for (const grp of ranked) {
     if (searched >= MAX_SEARCH) break;
     if (matchOf(grp)) continue;
-    searched++;
-    const n = [...grp.names][0];
-    const hits = await igdb<Raw[]>("games", `search "${quote(n)}"; ${FIELDS}; where game_type = ${GAME_TYPES}; limit 8;`);
-    const want = new Set([...grp.names].map(key));
-    const ok = hits.filter((h) => want.has(key(h.name)) || h.alternative_names?.some((a) => want.has(key(a.name))));
-    if (ok.length) for (const n2 of grp.names) for (const h of ok) add(key(n2), h);
+    const [names, stripped = []] = variants(grp.names);
+    for (const n of [...names, ...stripped].slice(0, 2)) {
+      searched++;
+      const hits = await igdb<Raw[]>("games", `search "${quote(n)}"; ${FIELDS}; where game_type = ${MATCH_TYPES}; limit 8;`);
+      const want = key(n);
+      const ok = hits.filter((h) => key(h.name) === want || h.alternative_names?.some((a) => key(a.name) === want));
+      for (const h of ok) add(want, h);
+      if (ok.length) break;
+    }
   }
 
-  // Junta por jogo (dois nomes podem ser o mesmo jogo) e fica só com os de 2022 para cá ou sem data
-  type Row = { game: Raw; views: number; videos: TrailerVideo[] };
-  const rows = new Map<number, Row>();
+  // DLC/expansão conta para o jogo principal
+  const matched = new Map<Group, number>();
   let unmatched = 0;
-  let old = 0;
+  let unmatchedViews = 0;
   const missed: string[] = [];
   for (const grp of ranked) {
     const g = matchOf(grp);
     if (!g) {
       unmatched++;
-      if (missed.length < 25) missed.push(`${[...grp.names][0]} (${(grp.views / 1e6).toFixed(1)} mi)`);
+      unmatchedViews += grp.views;
+      if (missed.length < 40) missed.push(`${grp.names[0]} (${(grp.views / 1e6).toFixed(1)} mi)`);
       continue;
     }
-    if (!recent(g)) {
+    matched.set(grp, [1, 2].includes(g.game_type ?? 0) && g.parent_game ? g.parent_game : g.id);
+  }
+
+  // Dados de cada jogo (nome, lançamento, plataformas, gênero) para filtrar e separar
+  const ids = [...new Set(matched.values())];
+  const info = new Map<number, Info>();
+  for (let i = 0; i < ids.length; i += 500) {
+    const rows = await igdb<Info[]>("games", `fields name,first_release_date,platforms,genres,themes,keywords; where id = (${ids.slice(i, i + 500).join(",")}); limit 500;`);
+    for (const r of rows) info.set(r.id, r);
+  }
+  const totalViews = ranked.reduce((n, g) => n + g.views, 0);
+  console.log(
+    `${matched.size} nomes ligados a ${ids.length} jogos (${searched} buscas); ${unmatched} sem par = ${((unmatchedViews / totalViews) * 100).toFixed(1)}% das visualizações`,
+  );
+  console.log(`sem par, mais vistos: ${missed.join(", ")}`);
+
+  // Vídeo -> jogo (só jogos de 2022 para cá ou sem data)
+  type Hit = { game: Info; video: Video };
+  const hits: Hit[] = [];
+  let old = 0;
+  for (const [grp, id] of matched) {
+    const game = info.get(id);
+    if (!game) continue;
+    if (!recentTs(game.first_release_date)) {
       old++;
       continue;
     }
-    const r = rows.get(g.id) ?? { game: g, views: 0, videos: [] };
-    r.views += grp.views;
-    r.videos.push(...grp.videos);
-    rows.set(g.id, r);
+    for (const video of grp.videos) hits.push({ game, video });
   }
-  const top = [...rows.values()].sort((a, b) => b.views - a.views).slice(0, KEEP);
-  console.log(`${rows.size} jogos no IGDB (${searched} pela busca); ${old} antigos fora; ${unmatched} sem par`);
-  console.log(`sem par, mais vistos: ${missed.join(", ")}`);
-  console.log("top 30:");
-  for (const r of top.slice(0, 30)) console.log(`  ${(r.views / 1e6).toFixed(1)} mi · ${r.videos.length} vídeos · ${r.game.name}`);
+  console.log(`${old} nomes de jogos antigos fora`);
+
+  const year = new Date().getUTCFullYear();
+  const lists: { id: string; source: string; platform: string; group: string; label: string; position: number; url: string; entries: MetacriticEntry[] }[] = [];
+  const rank = (hs: Hit[]) => {
+    const sum = new Map<number, { game: Info; views: number }>();
+    for (const h of hs) {
+      const r = sum.get(h.game.id) ?? { game: h.game, views: 0 };
+      r.views += h.video.views;
+      sum.set(h.game.id, r);
+    }
+    return [...sum.values()].sort((a, b) => b.views - a.views);
+  };
+  const toEntries = (rows: { game: Info; views: number }[]): MetacriticEntry[] =>
+    rows.map((r, i) => ({
+      rank: i + 1,
+      title: r.game.name,
+      year: r.game.first_release_date ? new Date(r.game.first_release_date * 1000).getUTCFullYear() : null,
+      score: String(r.views),
+      igdbId: r.game.id,
+    }));
+  for (const s of SOURCES) {
+    const url = `https://www.youtube.com/@${s.channel}/videos`;
+    for (const p of DISCOVER) {
+      const mine = hits.filter((h) => h.video.channel === s.channel && h.game.platforms?.includes(p.igdb));
+      const all = rank(mine);
+      if (!all.length) continue;
+      const base = { source: s.id, platform: p.id, url };
+      lists.push({ ...base, id: `${s.id}/${p.id}/top`, group: "geral", label: "Mais vistos desde 2022", position: 0, entries: toEntries(all.slice(0, TOP)) });
+      for (let y = year; y >= 2022; y--) {
+        const ofYear = rank(mine.filter((h) => new Date(h.video.ts * 1000).getUTCFullYear() === y));
+        if (ofYear.length) lists.push({ ...base, id: `${s.id}/${p.id}/ano-${y}`, group: "ano", label: String(y), position: 100 + (year - y), entries: toEntries(ofYear.slice(0, PER_YEAR)) });
+      }
+      for (const [i, [slug, label, test]] of GENRES.entries()) {
+        const rows = all.filter((r) => test(r.game));
+        if (rows.length >= MIN_GENRE) lists.push({ ...base, id: `${s.id}/${p.id}/genero-${slug}`, group: "genero", label, position: 200 + i, entries: toEntries(rows.slice(0, MAX_GENRE)) });
+      }
+      const own = lists.filter((l) => l.source === s.id && l.platform === p.id);
+      console.log(`${s.id}/${p.id}: ${all.length} jogos; ${own.length} listas (${own.filter((l) => l.group === "genero").length} gêneros)`);
+    }
+  }
+  const top = lists.find((l) => l.id === "ign/pc/top");
+  if (top) console.log(`ign/pc/top: ${top.entries.slice(0, 15).map((e) => e.title).join(", ")}`);
   if (DRY) return;
 
-  const values = top.map((r) => ({
-    igdbId: r.game.id,
-    title: r.game.name,
-    views: r.views,
-    videoCount: r.videos.length,
-    videos: [...r.videos].sort((a, b) => b.views - a.views).slice(0, 5),
-    platforms: r.game.platforms ?? [],
-    releaseDate: r.game.first_release_date ? new Date(r.game.first_release_date * 1000) : null,
-    updatedAt: new Date(),
-  }));
-  await db.delete(trailerGames);
-  for (let i = 0; i < values.length; i += 200) await db.insert(trailerGames).values(values.slice(i, i + 200));
-  console.log(`gravados ${values.length} jogos`);
+  for (const l of lists) {
+    const values = { ...l, updatedAt: new Date() };
+    await db.insert(metacriticLists).values(values).onConflictDoUpdate({ target: metacriticLists.id, set: values });
+  }
+  // Listas de trailers que não saíram nesta rodada somem
+  const keep = new Set(lists.map((l) => l.id));
+  for (const l of await db.select({ id: metacriticLists.id }).from(metacriticLists).where(inArray(metacriticLists.source, SOURCES.map((s) => s.id)))) {
+    if (!keep.has(l.id)) await db.delete(metacriticLists).where(eq(metacriticLists.id, l.id));
+  }
+  console.log(`gravadas ${lists.length} listas`);
 }
 
 main().then(

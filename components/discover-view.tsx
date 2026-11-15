@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { motion } from "motion/react";
 import { ArrowLeft, Gamepad2 } from "lucide-react";
-import { LISTS, listsFor, platformOf, PLATFORMS, type DiscoverGroup, type ListId, type PlatformId } from "@/lib/discover-lists";
+import { listOf, listsFor, platformOf, PLATFORMS, sourcesFor, type DiscoverGroup, type ListId, type PlatformId } from "@/lib/discover-lists";
 import { ptGenre } from "@/lib/genres";
 import { DiscoverGridSkeleton } from "./discover-skeleton";
 import { GUTTER } from "./rail";
@@ -29,7 +29,7 @@ export function DiscoverView({
   groups: DiscoverGroup[];
   backlog: Record<number, BacklogRef>;
   installed: number[];
-  /** Listas do Metacritic guardadas (só quando list = "mc") e a escolhida */
+  /** Sublistas guardadas (GameTrailers, IGN, Metacritic) e a escolhida */
   mc?: { lists: { slug: string; label: string; group: string }[]; selected: string | null; url: string | null };
 }) {
   const { owned, busy, toggle } = useBacklogToggle(backlog);
@@ -39,7 +39,7 @@ export function DiscoverView({
   // Fica na URL (e passa entre listas/plataformas): voltar de um jogo reabre do mesmo jeito
   const [hideMine, setHideMine] = useState(sp.get("esconder") === "1");
   const href = (p: PlatformId, l: ListId, m?: string | null) =>
-    `/descobrir?plataforma=${p}&lista=${l}${l === "mc" && m ? `&mc=${encodeURIComponent(m)}` : ""}${hideMine ? "&esconder=1" : ""}`;
+    `/descobrir?plataforma=${p}&lista=${l}${listOf(l).stored && m ? `&mc=${encodeURIComponent(m)}` : ""}${hideMine ? "&esconder=1" : ""}`;
   const mcSelected = mc?.lists.find((l) => l.slug === mc.selected);
 
   // Troca de plataforma/lista: o botão muda na hora e a grade vira esqueleto até a nova lista chegar do servidor
@@ -52,7 +52,7 @@ export function DiscoverView({
   function go(e: React.MouseEvent, p: PlatformId, l: ListId, m: string | null = null) {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return; // nova aba etc.: deixa o link
     e.preventDefault();
-    if (p === shownPlatform && l === shownList && (l !== "mc" || m === shownMc)) return;
+    if (p === shownPlatform && l === shownList && (!listOf(l).stored || m === shownMc)) return;
     setTarget({ p, l, m });
     startNav(() => router.push(href(p, l, m), { scroll: false }));
   }
@@ -64,7 +64,29 @@ export function DiscoverView({
     else url.searchParams.delete("esconder");
     window.history.replaceState(null, "", url.pathname + url.search);
   }
-  const meta = LISTS.find((l) => l.id === list)!;
+  const meta = listOf(list);
+  const shownMeta = listOf(shownList);
+  // Sublistas guardadas só aparecem para a lista já carregada (trocando de fonte, somem até a nova chegar)
+  const subs = mc && mc.lists.length > 0 && shownList === list && shownPlatform === platform ? mc.lists : [];
+  const subLink = (l: { slug: string; label: string }) => (
+    <Link
+      key={l.slug}
+      href={href(platform, list, l.slug)}
+      onClick={(e) => go(e, platform, list, l.slug)}
+      scroll={false}
+      aria-current={shownMc === l.slug ? "page" : undefined}
+      className={`shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-medium transition-colors ${shownMc === l.slug ? "bg-white text-black" : "text-white/70 hover:text-white"}`}
+    >
+      {l.label}
+    </Link>
+  );
+  const subRow = (label: string, items: { slug: string; label: string }[], aria: string) =>
+    items.length > 0 && (
+      <nav aria-label={aria} className="glass no-scrollbar flex max-w-full items-center gap-1 overflow-x-auto rounded-full p-1">
+        <span className="shrink-0 pl-2 pr-1 text-[11px] font-semibold uppercase tracking-wide text-text-3">{label}</span>
+        {items.map(subLink)}
+      </nav>
+    );
   const total = groups.reduce((n, g) => n + g.games.length, 0);
   const sections = useMemo(
     () =>
@@ -105,12 +127,15 @@ export function DiscoverView({
           {meta.label} no {platformOf(platform).label}
           {mcSelected ? (
             <>
-              {" "}· <span className="text-white/85">{mcSelected.group === "ano" ? `Melhores de ${mcSelected.label}` : mcSelected.label}</span>
+              {" "}·{" "}
+              <span className="text-white/85">
+                {mcSelected.group === "ano" ? `${list === "mc" ? "Melhores" : "Mais vistos"} de ${mcSelected.label}` : mcSelected.label}
+              </span>
               {mc?.url && mcSelected.group !== "genero" && (
                 <>
                   {" "}·{" "}
                   <a href={mc.url} target="_blank" rel="noopener noreferrer" className="text-text-3 underline-offset-2 hover:text-white hover:underline">
-                    ver no Metacritic
+                    {list === "mc" ? "ver no Metacritic" : "ver o canal"}
                   </a>
                 </>
               )}
@@ -124,20 +149,26 @@ export function DiscoverView({
       </header>
 
       <div className={`sticky top-0 z-30 mt-4 space-y-2.5 py-3 lg:top-20 ${GUTTER}`}>
+        {/* Fontes: IGDB, GameTrailers, IGN, Metacritic */}
         <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
-          <nav className="glass no-scrollbar inline-flex max-w-full gap-1 overflow-x-auto rounded-full p-1">
-            {listsFor(shownPlatform).map((l) => (
-              <Link
-                key={l.id}
-                href={href(shownPlatform, l.id)}
-                onClick={(e) => go(e, shownPlatform, l.id)}
-                scroll={false}
-                className="relative shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium"
-              >
-                {shownList === l.id && <motion.span layoutId="discover-list" className="btn-accent absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
-                <span className={`relative ${shownList === l.id ? "text-white" : "text-white/70"}`}>{l.short}</span>
-              </Link>
-            ))}
+          <nav aria-label="Fonte" className="glass no-scrollbar inline-flex max-w-full gap-1 overflow-x-auto rounded-full p-1">
+            {sourcesFor(shownPlatform).map((src) => {
+              const target: ListId = src.id === "igdb" ? (shownMeta.source === "igdb" ? shownList : "top") : src.id;
+              const on = shownMeta.source === src.id;
+              return (
+                <Link
+                  key={src.id}
+                  href={href(shownPlatform, target)}
+                  onClick={(e) => go(e, shownPlatform, target)}
+                  scroll={false}
+                  aria-current={on ? "page" : undefined}
+                  className="relative shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold"
+                >
+                  {on && <motion.span layoutId="discover-source" className="btn-accent absolute inset-0 rounded-full" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
+                  <span className={`relative ${on ? "text-white" : "text-white/70"}`}>{src.label}</span>
+                </Link>
+              );
+            })}
           </nav>
           <button
             onClick={toggleHide}
@@ -147,35 +178,39 @@ export function DiscoverView({
             Esconder o que já tenho
           </button>
         </div>
-        {/* Metacritic: as listas guardadas, por grupo (geral, por ano, por gênero) */}
-        {mc && mc.lists.length > 0 && shownList === "mc" && shownPlatform === platform && (
-          <nav aria-label="Listas do Metacritic" className="glass no-scrollbar flex max-w-full items-center gap-1 overflow-x-auto rounded-full p-1">
-            {(["geral", "ano", "genero"] as const).map((g) => {
-              const items = mc.lists.filter((l) => l.group === g);
-              if (!items.length) return null;
-              return (
-                <div key={g} className="flex shrink-0 items-center gap-1">
-                  {g !== "geral" && (
-                    <span className="shrink-0 pl-2 pr-1 text-[11px] font-semibold uppercase tracking-wide text-text-3">{g === "ano" ? "Ano" : "Gênero"}</span>
-                  )}
-                  {items.map((l) => (
-                    <Link
-                      key={l.slug}
-                      href={href(platform, "mc", l.slug)}
-                      onClick={(e) => go(e, platform, "mc", l.slug)}
-                      scroll={false}
-                      aria-current={shownMc === l.slug ? "page" : undefined}
-                      className={`shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
-                        shownMc === l.slug ? "bg-white text-black" : "text-white/70 hover:text-white"
-                      }`}
-                    >
-                      {l.label}
-                    </Link>
-                  ))}
-                </div>
-              );
-            })}
+
+        {/* IGDB: as listas dele */}
+        {shownMeta.source === "igdb" && (
+          <nav aria-label="Listas do IGDB" className="glass no-scrollbar flex max-w-full items-center gap-1 overflow-x-auto rounded-full p-1 sm:inline-flex">
+            {listsFor(shownPlatform)
+              .filter((l) => l.source === "igdb")
+              .map((l) => (
+                <Link
+                  key={l.id}
+                  href={href(shownPlatform, l.id)}
+                  onClick={(e) => go(e, shownPlatform, l.id)}
+                  scroll={false}
+                  aria-current={shownList === l.id ? "page" : undefined}
+                  className={`shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-medium transition-colors ${shownList === l.id ? "bg-white text-black" : "text-white/70 hover:text-white"}`}
+                >
+                  {l.short}
+                </Link>
+              ))}
           </nav>
+        )}
+
+        {/* Guardadas: geral e por ano numa linha, gêneros na de baixo */}
+        {subs.some((l) => l.group !== "genero") && (
+          <nav aria-label="Listas" className="glass no-scrollbar flex max-w-full items-center gap-1 overflow-x-auto rounded-full p-1">
+            {subs.filter((l) => l.group === "geral").map(subLink)}
+            {subs.some((l) => l.group === "ano") && <span className="shrink-0 pl-2 pr-1 text-[11px] font-semibold uppercase tracking-wide text-text-3">Ano</span>}
+            {subs.filter((l) => l.group === "ano").map(subLink)}
+          </nav>
+        )}
+        {subRow(
+          "Gênero",
+          subs.filter((l) => l.group === "genero"),
+          "Gêneros",
         )}
       </div>
 

@@ -7,11 +7,12 @@
  * Lê as páginas públicas /browse (o robots.txt permite), com pausa entre elas. Nomes que já foram ligados a um
  * jogo do IGDB numa rodada anterior não são procurados de novo.
  */
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, metacriticLists, type MetacriticEntry } from "../lib/db";
 import { igdb } from "../lib/sources/igdb";
 import { normalize, sleep } from "../lib/sources/http";
 import { getMetacriticPage, metacriticUrl, type MetacriticRow } from "../lib/sources/metacritic";
+import { GENRES, MAX_GENRE, MIN_GENRE, type Tax } from "../lib/game-genres";
 
 const arg = (name: string) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
 const ONLY = arg("only");
@@ -24,47 +25,7 @@ const PLATFORMS = [
 
 // Gêneros: o filtro de gênero do Metacritic marca poucos jogos (vários gêneros grandes nem devolvem nada), então a lista
 // de gênero é a base dos melhores do Metacritic desde FIRST_YEAR (na ordem e com a nota deles) separada pelo gênero,
-// tema ou palavra-chave do IGDB. Só entra o gênero com pelo menos MIN_GENRE jogos; cada lista mostra até MAX_GENRE.
-type Tax = { genres?: number[]; themes?: number[]; keywords?: number[] };
-const has = (list: number[] | undefined, ids: number[]) => !!list?.some((x) => ids.includes(x));
-const GENRES: [slug: string, label: string, test: (t: Tax) => boolean][] = [
-  ["rpg", "RPG", (t) => has(t.genres, [12])],
-  ["roguelike", "Roguelike e roguelite", (t) => has(t.keywords, [416, 17292])],
-  ["metroidvania", "Metroidvania", (t) => has(t.keywords, [477])],
-  ["soulslike", "Soulslike", (t) => has(t.keywords, [17326, 58746])],
-  ["acao", "Ação", (t) => has(t.themes, [1])],
-  ["aventura", "Aventura", (t) => has(t.genres, [31])],
-  ["plataforma", "Plataforma", (t) => has(t.genres, [8])],
-  ["tiro", "Tiro", (t) => has(t.genres, [5])],
-  ["hack-and-slash", "Hack and slash", (t) => has(t.genres, [25])],
-  ["luta", "Luta", (t) => has(t.genres, [4])],
-  ["corrida", "Corrida", (t) => has(t.genres, [10])],
-  ["esporte", "Esporte", (t) => has(t.genres, [14])],
-  ["estrategia", "Estratégia", (t) => has(t.genres, [15, 11, 16, 24])],
-  ["taticos", "Táticos e por turnos", (t) => has(t.genres, [16, 24])],
-  ["tempo-real", "Estratégia em tempo real", (t) => has(t.genres, [11])],
-  ["construcao", "Construção de cidades", (t) => has(t.keywords, [3533])],
-  ["simulacao", "Simulação", (t) => has(t.genres, [13])],
-  ["puzzle", "Puzzle", (t) => has(t.genres, [9])],
-  ["cartas", "Cartas e tabuleiro", (t) => has(t.genres, [35]) || has(t.keywords, [52703, 54521])],
-  ["point-and-click", "Point-and-click", (t) => has(t.genres, [2])],
-  ["visual-novel", "Visual novel", (t) => has(t.genres, [34])],
-  ["musica", "Ritmo e música", (t) => has(t.genres, [7])],
-  ["arcade", "Arcade", (t) => has(t.genres, [33])],
-  ["indie", "Indie", (t) => has(t.genres, [32])],
-  ["sobrevivencia", "Sobrevivência", (t) => has(t.themes, [21])],
-  ["terror", "Terror", (t) => has(t.themes, [19])],
-  ["mundo-aberto", "Mundo aberto", (t) => has(t.themes, [38])],
-  ["sandbox", "Sandbox", (t) => has(t.themes, [33])],
-  ["ficcao-cientifica", "Ficção científica", (t) => has(t.themes, [18])],
-  ["fantasia", "Fantasia", (t) => has(t.themes, [17])],
-  ["furtividade", "Furtividade", (t) => has(t.themes, [23])],
-  ["misterio", "Mistério", (t) => has(t.themes, [43])],
-  ["immersive-sim", "Immersive sim", (t) => has(t.keywords, [43194])],
-  ["cozy", "Cozy", (t) => has(t.keywords, [24685])],
-];
-const MIN_GENRE = 50;
-const MAX_GENRE = 100;
+// tema ou palavra-chave do IGDB (lib/game-genres).
 // Base dos gêneros: todos os jogos com nota no Metacritic desde FIRST_YEAR, ano a ano (até POOL_PAGES páginas por ano)
 const POOL_PAGES = 20;
 const FIRST_YEAR = 2022;
@@ -220,7 +181,7 @@ async function main() {
     // Listas que não existem mais nesta rodada (ex.: gênero que caiu abaixo do mínimo) saem
     if (!DRY) {
       const keep = new Set(defs.map((d) => d.id));
-      for (const l of await db.select({ id: metacriticLists.id }).from(metacriticLists).where(eq(metacriticLists.platform, p.id))) {
+      for (const l of await db.select({ id: metacriticLists.id }).from(metacriticLists).where(and(eq(metacriticLists.platform, p.id), eq(metacriticLists.source, "mc")))) {
         if (!keep.has(l.id)) await db.delete(metacriticLists).where(eq(metacriticLists.id, l.id));
       }
     }

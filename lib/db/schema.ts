@@ -185,11 +185,14 @@ export type SwitchGame = typeof switchGames.$inferSelect;
 
 // Listas do Metacritic guardadas (scripts/metacritic-sync.ts): só posição, nome, nota e o jogo do IGDB correspondente.
 // O Descobrir lê daqui e busca capa/screenshots no IGDB pelos ids, sem ir ao Metacritic na hora.
+// score: nota (Metacritic) ou visualizações somadas dos trailers (GameTrailers, IGN)
 export type MetacriticEntry = { rank: number; title: string; year: number | null; score: string; igdbId: number | null };
 export const metacriticLists = pgTable("metacritic_lists", {
-  // Ex.: "pc/top", "switch/ano-2025", "pc/genero-roguelike"
+  // Ex.: "pc/top", "switch/ano-2025", "pc/genero-roguelike" (Metacritic); "ign/pc/top" (trailers)
   id: text("id").primaryKey(),
-  // "pc" ou "switch" (as plataformas do Descobrir)
+  // De onde vem a lista: "mc" (Metacritic), "gametrailers" ou "ign" (trailers mais vistos no YouTube)
+  source: text("source").notNull().default("mc"),
+  // "pc", "switch" ou "android" (as plataformas do Descobrir)
   platform: text("platform").notNull(),
   // "geral", "ano" ou "genero"
   group: text("group").notNull(),
@@ -198,22 +201,6 @@ export const metacriticLists = pgTable("metacritic_lists", {
   // Página de origem no Metacritic
   url: text("url").notNull(),
   entries: jsonb("entries").$type<MetacriticEntry[]>().notNull().default([]),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
-// Jogos com os trailers mais vistos nos canais de trailers do YouTube (GameTrailers, IGN) desde 2022, para o Descobrir.
-// Uma linha por jogo do IGDB: soma das visualizações de todos os trailers dele e o trailer mais visto.
-export type TrailerVideo = { id: string; title: string; views: number; channel: string };
-export const trailerGames = pgTable("trailer_games", {
-  igdbId: integer("igdb_id").primaryKey(),
-  title: text("title").notNull(),
-  views: bigint("views", { mode: "number" }).notNull(),
-  videoCount: integer("video_count").notNull(),
-  // Os trailers mais vistos (até 5), do mais visto para o menos
-  videos: jsonb("videos").$type<TrailerVideo[]>().notNull().default([]),
-  // Plataformas do jogo no IGDB (filtra por PC/Switch/Android na página)
-  platforms: integer("platforms").array().notNull().default([]),
-  releaseDate: timestamp("release_date", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

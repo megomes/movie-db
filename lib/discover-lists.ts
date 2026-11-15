@@ -1,5 +1,5 @@
-// Listas para descobrir jogos: do IGDB, do Metacritic ou dos trailers mais vistos no YouTube (as duas últimas guardadas no
-// banco pelos scripts de sync; capa, screenshots etc. sempre do IGDB).
+// Listas para descobrir jogos: do IGDB, dos trailers mais vistos no YouTube (GameTrailers, IGN) ou do Metacritic (estas
+// guardadas no banco pelos scripts de sync; capa, screenshots etc. sempre do IGDB).
 
 // Plataformas (IDs do IGDB). Switch é só o original: exclusivos do Switch 2 ficam de fora.
 // metacritic: o caminho da plataforma no Metacritic (lá não tem Android)
@@ -11,20 +11,32 @@ export const PLATFORMS = [
 export type PlatformId = (typeof PLATFORMS)[number]["id"];
 export const isPlatformId = (v: unknown): v is PlatformId => PLATFORMS.some((p) => p.id === v);
 export const platformOf = (id: PlatformId) => PLATFORMS.find((p) => p.id === id)!;
-// mc: lista do Metacritic (só onde a plataforma existe lá)
+// Fontes (abas de cima) e as listas de cada uma. IGDB: listas montadas na hora. GameTrailers, IGN e Metacritic ("stored"):
+// listas guardadas no banco pelos scripts de sync, cada uma com sublistas (geral, por ano, por gênero) em ?mc=
+export const SOURCES = [
+  { id: "igdb", label: "IGDB" },
+  { id: "gametrailers", label: "GameTrailers" },
+  { id: "ign", label: "IGN" },
+  { id: "mc", label: "Metacritic" },
+] as const;
+export type SourceId = (typeof SOURCES)[number]["id"];
 export const LISTS = [
-  { id: "top", label: "Melhores", short: "Melhores", hint: "Nota mais alta, agrupados por quando foram lançados", mc: false },
-  { id: "hot", label: "Em alta agora", short: "Em alta", hint: "Os mais visitados no IGDB nos últimos dias", mc: false },
-  { id: "wanted", label: "Mais desejados", short: "Desejados", hint: "Os que mais gente marcou como “quero jogar”", mc: false },
-  { id: "new", label: "Lançamentos recentes", short: "Lançamentos", hint: "Lançados nos últimos 90 dias, os mais avaliados primeiro", mc: false },
-  { id: "soon", label: "Em breve", short: "Em breve", hint: "Ainda não lançados, os mais aguardados primeiro", mc: false },
-  { id: "trailers", label: "Trailers mais vistos", short: "Trailers", hint: "Soma das visualizações dos trailers no GameTrailers e na IGN desde 2022, sem anúncios pagos", mc: false },
-  { id: "mc", label: "Metacritic", short: "Metacritic", hint: "Listas do Metacritic (guardadas no app), com os dados do IGDB", mc: true },
+  { id: "top", source: "igdb", label: "Melhores", short: "Melhores", hint: "Nota mais alta, agrupados por quando foram lançados", stored: false },
+  { id: "hot", source: "igdb", label: "Em alta agora", short: "Em alta", hint: "Os mais visitados no IGDB nos últimos dias", stored: false },
+  { id: "wanted", source: "igdb", label: "Mais desejados", short: "Desejados", hint: "Os que mais gente marcou como “quero jogar”", stored: false },
+  { id: "new", source: "igdb", label: "Lançamentos recentes", short: "Lançamentos", hint: "Lançados nos últimos 90 dias, os mais avaliados primeiro", stored: false },
+  { id: "soon", source: "igdb", label: "Em breve", short: "Em breve", hint: "Ainda não lançados, os mais aguardados primeiro", stored: false },
+  { id: "gametrailers", source: "gametrailers", label: "GameTrailers", short: "GameTrailers", hint: "Trailers mais vistos no canal desde 2022, sem anúncios pagos", stored: true },
+  { id: "ign", source: "ign", label: "IGN", short: "IGN", hint: "Trailers mais vistos no canal desde 2022, sem anúncios pagos", stored: true },
+  { id: "mc", source: "mc", label: "Metacritic", short: "Metacritic", hint: "Listas do Metacritic (guardadas no app), com os dados do IGDB", stored: true },
 ] as const;
 export type ListId = (typeof LISTS)[number]["id"];
 export const isListId = (v: unknown): v is ListId => LISTS.some((l) => l.id === v);
-/** Listas que existem para a plataforma (as do Metacritic não têm Android) */
-export const listsFor = (p: PlatformId) => LISTS.filter((l) => !l.mc || platformOf(p).metacritic);
+export const listOf = (id: ListId) => LISTS.find((l) => l.id === id)!;
+/** Listas que existem para a plataforma (o Metacritic não tem Android) */
+export const listsFor = (p: PlatformId) => LISTS.filter((l) => l.id !== "mc" || platformOf(p).metacritic);
+/** Fontes com alguma lista na plataforma */
+export const sourcesFor = (p: PlatformId) => SOURCES.filter((s) => listsFor(p).some((l) => l.source === s.id));
 
 // Grupos dos "Melhores" por data de lançamento, acumulando: cada um pega tudo até o seu limite (2 anos = os últimos 2 anos
 // inteiros) e pula o que já apareceu acima. Quem ficou de fora pelo corte de 60 num grupo pode aparecer no seguinte.
@@ -55,6 +67,6 @@ export type DiscoverGame = {
   genres: string[];
   /** Nota do Metacritic, nas listas de lá (ex.: "97" ou "9.6") */
   score?: string;
-  /** Visualizações somadas dos trailers (lista "Trailers") */
+  /** Visualizações somadas dos trailers (listas do GameTrailers e da IGN) */
   views?: number;
 };

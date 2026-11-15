@@ -1,8 +1,8 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
 import { GAME_TYPES, igdb, img } from "@/lib/sources/igdb";
-import { arrayContains, asc, desc, eq } from "drizzle-orm";
-import { db, metacriticLists, trailerGames } from "@/lib/db";
+import { and, asc, eq } from "drizzle-orm";
+import { db, metacriticLists } from "@/lib/db";
 
 import { PERIODS, platformOf, type DiscoverGame, type DiscoverGroup, type ListId, type PeriodId, type PlatformId } from "@/lib/discover-lists";
 
@@ -88,13 +88,13 @@ async function fetchList(platformId: PlatformId, id: ListId, period: PeriodId = 
       rows = await igdb<Raw[]>("games", `${FIELDS}; where ${where} & first_release_date > ${now}; sort hypes desc; limit ${LIMIT};`);
       break;
     default:
-      // Listas do Metacritic têm o próprio caminho (getMetacritic)
+      // Listas guardadas (Metacritic, GameTrailers, IGN) têm o próprio caminho (getStoredGroups)
       rows = [];
   }
   return rows.map(toGame);
 }
 
-// Jogos do IGDB por id (listas do Metacritic guardadas no banco): uma consulta a cada 500, na ordem pedida
+// Jogos do IGDB por id (listas guardadas no banco): uma consulta a cada 500, na ordem pedida
 async function fetchByIds(key: string): Promise<DiscoverGame[]> {
   const ids = key.split(",").map(Number).filter(Boolean);
   const out: Raw[] = [];
@@ -105,19 +105,18 @@ async function fetchByIds(key: string): Promise<DiscoverGame[]> {
 }
 const getByIds = unstable_cache(fetchByIds, ["discover-ids-v1"], { revalidate: 60 * 60 * 12 });
 
-/** As listas do Metacritic guardadas para a plataforma (sem os jogos), na ordem de exibição */
-export async function listMetacriticLists(platform: PlatformId) {
-  const rows = await db
+/** As listas guardadas (Metacritic, GameTrailers ou IGN) da plataforma, sem os jogos, na ordem de exibição */
+export async function listStoredLists(source: string, platform: PlatformId) {
+  return db
     .select({ id: metacriticLists.id, group: metacriticLists.group, label: metacriticLists.label, position: metacriticLists.position, url: metacriticLists.url })
     .from(metacriticLists)
-    .where(eq(metacriticLists.platform, platform))
+    .where(and(eq(metacriticLists.source, source), eq(metacriticLists.platform, platform)))
     .orderBy(asc(metacriticLists.position));
-  return rows;
 }
-export type MetacriticListMeta = Awaited<ReturnType<typeof listMetacriticLists>>[number];
+export type StoredListMeta = Awaited<ReturnType<typeof listStoredLists>>[number];
 
-/** Uma lista do Metacritic: a ordem e a nota vêm do banco; capa, screenshots etc. do IGDB pelos ids */
-export async function getMetacriticGroups(listId: string): Promise<DiscoverGroup[]> {
+/** Uma lista guardada: a ordem e a nota (ou as visualizações) vêm do banco; capa, screenshots etc. do IGDB pelos ids */
+export async function getStoredGroups(listId: string): Promise<DiscoverGroup[]> {
   const [row] = await db.select().from(metacriticLists).where(eq(metacriticLists.id, listId));
   if (!row) return [];
   const entries = row.entries.filter((e) => e.igdbId != null);
@@ -129,26 +128,9 @@ export async function getMetacriticGroups(listId: string): Promise<DiscoverGroup
     const g = byId.get(e.igdbId!);
     if (!g || seen.has(g.igdbId)) continue;
     seen.add(g.igdbId);
-    games.push({ ...g, score: e.score || undefined });
+    games.push(row.source === "mc" ? { ...g, score: e.score || undefined } : { ...g, views: Number(e.score) || undefined });
   }
   return [{ id: row.id, title: null, hint: null, games }];
-}
-
-// Trailers mais vistos (GameTrailers + IGN, guardados pelo sync) dos jogos que saem na plataforma
-const TRAILER_LIMIT = 150;
-export async function getTrailerGroups(platform: PlatformId): Promise<DiscoverGroup[]> {
-  const rows = await db
-    .select({ igdbId: trailerGames.igdbId, views: trailerGames.views })
-    .from(trailerGames)
-    .where(arrayContains(trailerGames.platforms, [platformOf(platform).igdb]))
-    .orderBy(desc(trailerGames.views))
-    .limit(TRAILER_LIMIT);
-  const byId = new Map((await getByIds(rows.map((r) => r.igdbId).join(","))).map((g) => [g.igdbId, g]));
-  const games = rows.flatMap((r) => {
-    const g = byId.get(r.igdbId);
-    return g ? [{ ...g, views: r.views }] : [];
-  });
-  return [{ id: "trailers", title: null, hint: null, games }];
 }
 
 // Atualiza a cada 12h: as listas mudam devagar e o IGDB limita a 4 req/s
