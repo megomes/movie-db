@@ -1,5 +1,5 @@
 import { DiscoverView } from "@/components/discover-view";
-import { getDiscoverGroups, getMetacriticGroups, isListId, isPlatformId, LISTS, listMetacriticLists, listsFor, PLATFORMS } from "@/lib/discover";
+import { getDiscoverGroups, getMetacriticGroups, getTrailerGroups, isListId, isPlatformId, LISTS, listMetacriticLists, listsFor, PLATFORMS } from "@/lib/discover";
 import { backlogByIgdb, listSwitchGames } from "@/lib/queries";
 import { requireUser } from "@/lib/session";
 
@@ -17,7 +17,7 @@ export default async function DiscoverPage({ searchParams }: PageProps<"/descobr
   const mc = mcLists.find((l) => l.id === `${platform}/${sp.mc}`) ?? mcLists[0] ?? null;
 
   const [groups, installed] = await Promise.all([
-    list === "mc" ? (mc ? getMetacriticGroups(mc.id) : []) : getDiscoverGroups(platform, list),
+    list === "mc" ? (mc ? getMetacriticGroups(mc.id) : []) : list === "trailers" ? getTrailerGroups(platform) : getDiscoverGroups(platform, list),
     platform === "switch" ? listSwitchGames(user.id) : [],
   ]);
   const backlog = await backlogByIgdb(user.id, groups.flatMap((g) => g.games.map((x) => x.igdbId)));

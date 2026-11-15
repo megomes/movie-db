@@ -12,6 +12,7 @@
     "import:obsidian": "tsx --env-file=.env.local scripts/import-obsidian.ts",
     "import:switch": "tsx --env-file=.env.local scripts/import-switch.ts",
     "sync:metacritic": "tsx --conditions=react-server --env-file=.env.local scripts/metacritic-sync.ts",
+    "sync:trailers": "tsx --conditions=react-server --env-file=.env.local scripts/trailers-sync.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -1,4 +1,5 @@
-// Listas para descobrir jogos: do IGDB ou do Metacritic (com os dados do IGDB). Nada é guardado no banco.
+// Listas para descobrir jogos: do IGDB, do Metacritic ou dos trailers mais vistos no YouTube (as duas últimas guardadas no
+// banco pelos scripts de sync; capa, screenshots etc. sempre do IGDB).
 
 // Plataformas (IDs do IGDB). Switch é só o original: exclusivos do Switch 2 ficam de fora.
 // metacritic: o caminho da plataforma no Metacritic (lá não tem Android)
@@ -17,6 +18,7 @@ export const LISTS = [
   { id: "wanted", label: "Mais desejados", short: "Desejados", hint: "Os que mais gente marcou como “quero jogar”", mc: false },
   { id: "new", label: "Lançamentos recentes", short: "Lançamentos", hint: "Lançados nos últimos 90 dias, os mais avaliados primeiro", mc: false },
   { id: "soon", label: "Em breve", short: "Em breve", hint: "Ainda não lançados, os mais aguardados primeiro", mc: false },
+  { id: "trailers", label: "Trailers mais vistos", short: "Trailers", hint: "Soma das visualizações dos trailers no GameTrailers e na IGN desde 2022, sem anúncios pagos", mc: false },
   { id: "mc", label: "Metacritic", short: "Metacritic", hint: "Listas do Metacritic (guardadas no app), com os dados do IGDB", mc: true },
 ] as const;
 export type ListId = (typeof LISTS)[number]["id"];
@@ -53,4 +55,6 @@ export type DiscoverGame = {
   genres: string[];
   /** Nota do Metacritic, nas listas de lá (ex.: "97" ou "9.6") */
   score?: string;
+  /** Visualizações somadas dos trailers (lista "Trailers") */
+  views?: number;
 };

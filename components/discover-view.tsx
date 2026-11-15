@@ -12,6 +12,7 @@ import { GUTTER } from "./rail";
 import { CardMenuButton, HOLD_CLASS, useMenuTrigger } from "./game-menu";
 import { BacklogButton, ShotCover, useBacklogToggle, type BacklogRef } from "./shot-cover";
 
+const viewsFmt = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 });
 const dateFmt = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 
 // Listas de jogos (PC, Switch, Android) para descobrir o que jogar: passa o mouse para ver screenshots
@@ -210,7 +211,9 @@ export function DiscoverView({
                       >
                         <span className="rounded-full bg-black/65 px-2 py-0.5 text-[11px] font-semibold tabular-nums ring-1 ring-white/10">
                           #{rank}
-                          {g.score ? (
+                          {g.views ? (
+                            <span className="text-white/70"> · ▶ {viewsFmt.format(g.views)}</span>
+                          ) : g.score ? (
                             <span className="text-white/70"> · MC {g.score}</span>
                           ) : (
                             g.rating != null && list !== "soon" && <span className="text-white/70"> · ★ {g.rating}</span>

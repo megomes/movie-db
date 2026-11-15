@@ -4,6 +4,7 @@ import {
   uuid,
   text,
   integer,
+  bigint,
   boolean,
   real,
   jsonb,
@@ -198,6 +199,31 @@ export const metacriticLists = pgTable("metacritic_lists", {
   url: text("url").notNull(),
   entries: jsonb("entries").$type<MetacriticEntry[]>().notNull().default([]),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Jogos com os trailers mais vistos nos canais de trailers do YouTube (GameTrailers, IGN) desde 2022, para o Descobrir.
+// Uma linha por jogo do IGDB: soma das visualizações de todos os trailers dele e o trailer mais visto.
+export type TrailerVideo = { id: string; title: string; views: number; channel: string };
+export const trailerGames = pgTable("trailer_games", {
+  igdbId: integer("igdb_id").primaryKey(),
+  title: text("title").notNull(),
+  views: bigint("views", { mode: "number" }).notNull(),
+  videoCount: integer("video_count").notNull(),
+  // Os trailers mais vistos (até 5), do mais visto para o menos
+  videos: jsonb("videos").$type<TrailerVideo[]>().notNull().default([]),
+  // Plataformas do jogo no IGDB (filtra por PC/Switch/Android na página)
+  platforms: integer("platforms").array().notNull().default([]),
+  releaseDate: timestamp("release_date", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// Curtidas de vídeos do YouTube já conferidas pelo sync de trailers: muita visualização com pouquíssima curtida é anúncio
+// pago (impulsionado), que não conta. Guardado para não perguntar de novo a cada rodada.
+export const youtubeLikes = pgTable("youtube_likes", {
+  videoId: text("video_id").primaryKey(),
+  views: bigint("views", { mode: "number" }).notNull(),
+  likes: integer("likes"),
+  checkedAt: timestamp("checked_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 // Jogos, filmes e séries sugeridos por outras IAs (a partir do backlog exportado), com quais IAs sugeriram cada um

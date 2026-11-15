@@ -1,8 +1,8 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
 import { GAME_TYPES, igdb, img } from "@/lib/sources/igdb";
-import { asc, eq } from "drizzle-orm";
-import { db, metacriticLists } from "@/lib/db";
+import { arrayContains, asc, desc, eq } from "drizzle-orm";
+import { db, metacriticLists, trailerGames } from "@/lib/db";
 
 import { PERIODS, platformOf, type DiscoverGame, type DiscoverGroup, type ListId, type PeriodId, type PlatformId } from "@/lib/discover-lists";
 
@@ -132,6 +132,23 @@ export async function getMetacriticGroups(listId: string): Promise<DiscoverGroup
     games.push({ ...g, score: e.score || undefined });
   }
   return [{ id: row.id, title: null, hint: null, games }];
+}
+
+// Trailers mais vistos (GameTrailers + IGN, guardados pelo sync) dos jogos que saem na plataforma
+const TRAILER_LIMIT = 150;
+export async function getTrailerGroups(platform: PlatformId): Promise<DiscoverGroup[]> {
+  const rows = await db
+    .select({ igdbId: trailerGames.igdbId, views: trailerGames.views })
+    .from(trailerGames)
+    .where(arrayContains(trailerGames.platforms, [platformOf(platform).igdb]))
+    .orderBy(desc(trailerGames.views))
+    .limit(TRAILER_LIMIT);
+  const byId = new Map((await getByIds(rows.map((r) => r.igdbId).join(","))).map((g) => [g.igdbId, g]));
+  const games = rows.flatMap((r) => {
+    const g = byId.get(r.igdbId);
+    return g ? [{ ...g, views: r.views }] : [];
+  });
+  return [{ id: "trailers", title: null, hint: null, games }];
 }
 
 // Atualiza a cada 12h: as listas mudam devagar e o IGDB limita a 4 req/s
