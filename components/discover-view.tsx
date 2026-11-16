@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { motion } from "motion/react";
 import { ArrowLeft, Gamepad2 } from "lucide-react";
-import { listOf, listsFor, platformOf, PLATFORMS, sourcesFor, type DiscoverGroup, type ListId, type PlatformId } from "@/lib/discover-lists";
+import { EXCLUSIVE_LABEL, listOf, listsFor, platformOf, PLATFORMS, sourcesFor, type DiscoverGroup, type ListId, type PlatformId } from "@/lib/discover-lists";
 import { ptGenre } from "@/lib/genres";
 import { DiscoverGridSkeleton } from "./discover-skeleton";
 import { GUTTER } from "./rail";
@@ -38,8 +38,10 @@ export function DiscoverView({
   const sp = useSearchParams();
   // Fica na URL (e passa entre listas/plataformas): voltar de um jogo reabre do mesmo jeito
   const [hideMine, setHideMine] = useState(sp.get("esconder") === "1");
+  // Switch: só os exclusivos da Nintendo; PC: só os que não saem em console (vale em qualquer lista)
+  const [onlyExclusive, setOnlyExclusive] = useState(sp.get("exclusivos") === "1");
   const href = (p: PlatformId, l: ListId, m?: string | null) =>
-    `/descobrir?plataforma=${p}&lista=${l}${listOf(l).stored && m ? `&mc=${encodeURIComponent(m)}` : ""}${hideMine ? "&esconder=1" : ""}`;
+    `/descobrir?plataforma=${p}&lista=${l}${listOf(l).stored && m ? `&mc=${encodeURIComponent(m)}` : ""}${hideMine ? "&esconder=1" : ""}${onlyExclusive ? "&exclusivos=1" : ""}`;
   const mcSelected = mc?.lists.find((l) => l.slug === mc.selected);
 
   // Troca de plataforma/lista: o botão muda na hora e a grade vira esqueleto até a nova lista chegar do servidor
@@ -56,14 +58,21 @@ export function DiscoverView({
     setTarget({ p, l, m });
     startNav(() => router.push(href(p, l, m), { scroll: false }));
   }
-  function toggleHide() {
-    const next = !hideMine;
-    setHideMine(next);
+  function toggleParam(name: string, next: boolean) {
     const url = new URL(window.location.href);
-    if (next) url.searchParams.set("esconder", "1");
-    else url.searchParams.delete("esconder");
+    if (next) url.searchParams.set(name, "1");
+    else url.searchParams.delete(name);
     window.history.replaceState(null, "", url.pathname + url.search);
   }
+  function toggleHide() {
+    setHideMine(!hideMine);
+    toggleParam("esconder", !hideMine);
+  }
+  function toggleExclusive() {
+    setOnlyExclusive(!onlyExclusive);
+    toggleParam("exclusivos", !onlyExclusive);
+  }
+  const exclusiveOn = onlyExclusive && !!EXCLUSIVE_LABEL[platform];
   const meta = listOf(list);
   const shownMeta = listOf(shownList);
   // Sublistas guardadas só aparecem para a lista já carregada (trocando de fonte, somem até a nova chegar)
@@ -91,9 +100,12 @@ export function DiscoverView({
   const sections = useMemo(
     () =>
       groups
-        .map((g) => ({ ...g, visible: hideMine ? g.games.filter((x) => !installed.has(x.igdbId) && !owned[x.igdbId]) : g.games }))
+        .map((g) => ({
+          ...g,
+          visible: g.games.filter((x) => (!hideMine || (!installed.has(x.igdbId) && !owned[x.igdbId])) && (!exclusiveOn || x.exclusive === platform)),
+        }))
         .filter((g) => g.visible.length),
-    [groups, hideMine, installed, owned],
+    [groups, hideMine, installed, owned, exclusiveOn, platform],
   );
 
   return (
@@ -177,6 +189,15 @@ export function DiscoverView({
           >
             Esconder o que já tenho
           </button>
+          {EXCLUSIVE_LABEL[shownPlatform] && (
+            <button
+              onClick={toggleExclusive}
+              aria-pressed={onlyExclusive}
+              className={`tap h-9 shrink-0 self-start rounded-full px-3.5 text-[13px] font-medium transition-colors sm:self-auto ${onlyExclusive ? "btn-accent" : "glass text-white/75 hover:text-white"}`}
+            >
+              {EXCLUSIVE_LABEL[shownPlatform]}
+            </button>
+          )}
         </div>
 
         {/* IGDB: as listas dele */}
@@ -286,7 +307,7 @@ export function DiscoverView({
           </section>
         ))}
       </div>
-      {!loading && !sections.length && <p className="px-4 py-24 text-center text-text-2">{total ? "Você já tem todos desta lista!" : "Não deu pra carregar esta lista agora."}</p>}
+      {!loading && !sections.length && <p className="px-4 py-24 text-center text-text-2">{!total ? "Não deu pra carregar esta lista agora." : exclusiveOn && !groups.some((g) => g.games.some((x) => x.exclusive === platform)) ? `Nenhum exclusivo ${platform === "pc" ? "do PC" : "do Switch"} nesta lista.` : "Você já tem todos desta lista!"}</p>}
     </div>
   );
 }

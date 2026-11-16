@@ -9,6 +9,32 @@ export const PLATFORMS = [
   { id: "android", label: "Android", igdb: 34, metacritic: null },
 ] as const;
 export type PlatformId = (typeof PLATFORMS)[number]["id"];
+// Plataformas da Nintendo no IGDB (Switch, Switch 2, Wii U, 3DS, Wii, DS, GameCube, N64, Game Boy, NES, SNES...):
+// jogo só nelas = exclusivo da Nintendo
+export const NINTENDO_PLATFORMS = new Set([130, 508, 41, 37, 137, 5, 20, 159, 21, 4, 416, 24, 22, 33, 18, 99, 51, 19, 58, 306, 131, 87, 307, 166, 47, 510]);
+// Computador no IGDB (Windows, Mac, Linux, DOS, navegador): jogo só neles = exclusivo do PC
+export const PC_PLATFORMS = new Set([6, 14, 3, 13, 82]);
+/**
+ * Exclusividade do jogo pelas plataformas do IGDB: só Nintendo, só PC ou nenhuma. Port, coletânea e edição de outro jogo
+ * (o IGDB cria entradas só da versão de Switch) não contam; remaster/versão expandida só se o original também for.
+ */
+export function exclusiveOf(g: {
+  platforms?: number[];
+  game_type?: number;
+  version_parent?: { platforms?: number[] };
+  parent_game?: { platforms?: number[]; parent_game?: { platforms?: number[] } };
+}): "switch" | "pc" | null {
+  if (!g.platforms?.length || g.version_parent || g.game_type === 3 || g.game_type === 11) return null;
+  // O original pode ser outra versão (ex.: a de Wii) que aponta para o jogo multiplataforma: sobe até dois níveis
+  const parents = [g.parent_game, g.parent_game?.parent_game].filter((x) => x != null);
+  const lists = [g.platforms, ...parents.map((x) => x.platforms ?? [])];
+  for (const [id, set] of [["switch", NINTENDO_PLATFORMS], ["pc", PC_PLATFORMS]] as const) {
+    if (lists.every((l) => l.length && l.every((p) => set.has(p)))) return id;
+  }
+  return null;
+}
+/** Nome do botão de exclusivos por plataforma do Descobrir */
+export const EXCLUSIVE_LABEL: Partial<Record<PlatformId, string>> = { switch: "Switch Exclusives", pc: "PC Only" };
 export const isPlatformId = (v: unknown): v is PlatformId => PLATFORMS.some((p) => p.id === v);
 export const platformOf = (id: PlatformId) => PLATFORMS.find((p) => p.id === id)!;
 // Fontes (abas de cima) e as listas de cada uma. IGDB: listas montadas na hora. GameTrailers, IGN e Metacritic ("stored"):
@@ -67,6 +93,8 @@ export type DiscoverGame = {
   genres: string[];
   /** Nota do Metacritic, nas listas de lá (ex.: "97" ou "9.6") */
   score?: string;
+  /** Só sai em plataformas da Nintendo ("switch") ou só no computador ("pc") */
+  exclusive: "switch" | "pc" | null;
   /** Visualizações somadas dos trailers (listas do GameTrailers e da IGN) */
   views?: number;
 };

@@ -4,7 +4,7 @@ import { GAME_TYPES, igdb, img } from "@/lib/sources/igdb";
 import { and, asc, eq } from "drizzle-orm";
 import { db, metacriticLists } from "@/lib/db";
 
-import { PERIODS, platformOf, type DiscoverGame, type DiscoverGroup, type ListId, type PeriodId, type PlatformId } from "@/lib/discover-lists";
+import { exclusiveOf, PERIODS, platformOf, type DiscoverGame, type DiscoverGroup, type ListId, type PeriodId, type PlatformId } from "@/lib/discover-lists";
 
 export * from "@/lib/discover-lists";
 
@@ -18,9 +18,12 @@ type Raw = {
   total_rating_count?: number;
   genres?: { name: string }[];
   platforms?: number[];
+  game_type?: number;
+  version_parent?: { platforms?: number[] };
+  parent_game?: { platforms?: number[]; parent_game?: { platforms?: number[] } };
 };
 
-const FIELDS = "fields name,first_release_date,cover.image_id,screenshots.image_id,total_rating,total_rating_count,genres.name";
+const FIELDS = "fields name,first_release_date,cover.image_id,screenshots.image_id,total_rating,total_rating_count,genres.name,platforms,game_type,version_parent.platforms,parent_game.platforms,parent_game.parent_game.platforms";
 const POPULARITY = { visits: 1, wantToPlay: 2 } as const;
 const LIMIT = 100;
 // Cada grupo dos "Melhores" mostra no máximo isso; os cortados podem aparecer no grupo seguinte
@@ -38,6 +41,7 @@ function toGame(g: Raw): DiscoverGame {
     rating: g.total_rating ? Math.round(g.total_rating) : null,
     ratingCount: g.total_rating_count ?? 0,
     genres: (g.genres ?? []).map((x) => x.name),
+    exclusive: exclusiveOf(g),
   };
 }
 
@@ -103,7 +107,7 @@ async function fetchByIds(key: string): Promise<DiscoverGame[]> {
   }
   return out.map(toGame);
 }
-const getByIds = unstable_cache(fetchByIds, ["discover-ids-v1"], { revalidate: 60 * 60 * 12 });
+const getByIds = unstable_cache(fetchByIds, ["discover-ids-v5"], { revalidate: 60 * 60 * 12 });
 
 /** As listas guardadas (Metacritic, GameTrailers ou IGN) da plataforma, sem os jogos, na ordem de exibição */
 export async function listStoredLists(source: string, platform: PlatformId) {
@@ -134,7 +138,7 @@ export async function getStoredGroups(listId: string): Promise<DiscoverGroup[]> 
 }
 
 // Atualiza a cada 12h: as listas mudam devagar e o IGDB limita a 4 req/s
-export const getDiscoverList = unstable_cache(fetchList, ["discover-v5"], { revalidate: 60 * 60 * 12 });
+export const getDiscoverList = unstable_cache(fetchList, ["discover-v9"], { revalidate: 60 * 60 * 12 });
 
 // Lista pronta para a página: "Melhores" vem em grupos por data de lançamento, cada um sem repetir os de cima
 export async function getDiscoverGroups(platform: PlatformId, id: ListId): Promise<DiscoverGroup[]> {
